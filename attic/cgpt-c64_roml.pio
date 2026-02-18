@@ -1,0 +1,28 @@
+
+.program c64_roml
+.side_set 0 opt
+
+.wrap_target
+
+wait_phi2:
+    wait 1 pin 26        ; aspetta PHI2 alto
+
+check_roml:
+    jmp pin not_selected ; salta se /ROML alto
+
+    in pins, 13          ; legge A0-A12
+    push block           ; manda indirizzo alla CPU
+    pull block           ; aspetta dato dalla CPU
+
+    set pindirs, 8;      ; D0-D7 diventano OUTPUT
+    out pins, 8          ; mette dato su D0-D7 
+
+    set pindirs, 0          ; D0-D7 INPUT (tri-state)
+    jmp wait_phi2
+
+not_selected:
+    ;set pindirs, 0          ; D0-D7 INPUT (tri-state)
+    jmp wait_phi2
+
+.wrap
+

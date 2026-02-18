@@ -1,0 +1,16 @@
+.program c64_roml
+.side_set 0 opt
+
+wait_roml_low:
+    wait 0 pin 0        ; attendi /ROML = LOW
+    nop                 ; breve stabilizzazione
+    in pins, 16         ; leggi A0..A15
+    push block          ; invia indirizzo alla CPU RP2040
+    pull block          ; aspetta il byte dalla TX FIFO
+    ;set pindirs, 8      ; imposta i primi 8 pins mappati come output
+    ;out pins, 8         ; scrivi il byte su D0..D7
+wait_roml_high:
+    wait 1 pin 0        ; attendi /ROML = HIGH
+    ;set pindirs, 0      ; riporta i primi 8 pins mappati come input
+    jmp wait_roml_low
+

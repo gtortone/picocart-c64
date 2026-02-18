@@ -1,0 +1,50 @@
+#ifndef BOARD_H_
+#define BOARD_H_
+
+#include "hardware/structs/sio.h"
+
+// ADDR GPIO pins       :     GP0 - GP15
+#define PINROMADDR    0
+#define ADDRWIDTH    16
+
+// DATA GPIO pins       :     GP16 - GP23
+#define PINROMDATA   16
+#define DATAWIDTH     8
+
+// CONTROL pins
+#define IO1          24
+#define IO2          25
+#define PHI2         26
+#define ROML         27
+#define ROMH         28
+#define RESET        29
+#define EXROM        30
+#define GAME         31
+#define RW           32
+#define LED          39
+
+#define UART_ID      uart0
+#define UART_TX      46
+#define UART_RX      47
+
+#define ROML_MASK    ((uint64_t)1 << ROML)
+#define ROMH_MASK    ((uint64_t)1 << ROMH)
+#define RW_MASK      ((uint64_t)1 << RW)
+
+// masks
+#define ADDR_GPIO_MASK     (0xFFFF << PINROMADDR)
+#define DATA_GPIO_MASK     (0xFF << PINROMDATA)
+
+#define SET_DATA_MODE_OUT   gpio_set_dir_out_masked(DATA_GPIO_MASK);
+#define SET_DATA_MODE_IN    gpio_set_dir_in_masked(DATA_GPIO_MASK);
+
+#define ADDR_IN (sio_hw->gpio_in & ADDR_GPIO_MASK) >> PINROMADDR
+#define DATA_OUT(v) sio_hw->gpio_togl = (sio_hw->gpio_out ^ (v << PINROMDATA)) & DATA_GPIO_MASK
+#define DATA_IN ((sio_hw->gpio_in & DATA_GPIO_MASK) >> PINROMDATA)
+#define DATA_IN_BYTE DATA_IN
+
+#define PSRAM_BASE 0x11000000
+
+void board_setup(void);
+
+#endif
