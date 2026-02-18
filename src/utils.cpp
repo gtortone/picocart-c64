@@ -5,18 +5,25 @@
 #include "utils.h"
 
 void trim(char *str) {
-   if (str == NULL) 
+   if (str == NULL)
       return;
 
-   while (*str && isspace((unsigned char)*str))
-      str++;
+   int i = 0, j = 0;
 
-   if (*str == '\0')
+   while (isspace((unsigned char)str[i])) 
+      i++;
+
+   if (str[i] == '\0') {
+      str[0] = '\0';
       return;
+   }
 
-   char *end = str + strlen(str) - 1;
-   while (end > str && isspace((unsigned char)*end))
-      end--;
+   while (str[i] != '\0') 
+      str[j++] = str[i++];
 
-    *(end + 1) = '\0';
+   str[j] = '\0';
+
+   j--;  // Torniamo all'ultimo carattere valido
+   while (j >= 0 && isspace((unsigned char)str[j]))
+        str[j--] = '\0';
 }

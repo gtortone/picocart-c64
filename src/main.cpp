@@ -35,6 +35,7 @@ int main() {
    
    multicore_launch_core1(run_cart);
 
+   printf("\n\n-- PicoCart-64 shell --\n\n");
    printf("> ");
    while(1) {
       while (uart_is_readable(UART_ID)) {
@@ -48,6 +49,7 @@ int main() {
 
          if (c == '\r' || c == '\n') {
             cmd_buffer[cmd_index] = '\0';
+            trim(cmd_buffer);
 
             if (strcmp(cmd_buffer, "reset") == 0) {
                printf("C64 reset\n");
