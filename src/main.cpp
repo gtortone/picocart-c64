@@ -5,6 +5,7 @@
 #include "pico/multicore.h"
 #include "pico/stdio_uart.h"
 #include "hardware/clocks.h"
+#include "hardware/watchdog.h"
 
 #include "board.h"
 #include "c64_interface.h"
@@ -47,16 +48,31 @@ int main() {
             uart_putc(UART_ID, '\n');
          } else uart_putc(UART_ID, c);
 
+         // process command
          if (c == '\r' || c == '\n') {
             cmd_buffer[cmd_index] = '\0';
             trim(cmd_buffer);
+            
+            char *token = strtok(cmd_buffer, " ");
 
-            if (strcmp(cmd_buffer, "reset") == 0) {
-               printf("C64 reset\n");
-               c64_reset();
+            // reset command
+            if (strcmp(token, "reset") == 0) {
+               // parameter: [cpu], [c64]
+               token = strtok(NULL, " ");
+               if (strcmp(token, "c64") == 0) {
+                  printf("C64 reset\n");
+                  c64_reset();
+               } else if (strcmp(token, "pico") == 0) {
+                  printf("PICO reset\n");
+                  watchdog_enable(100, 0);
+               } else {
+                  printf("reset [c64 | pico]\n");
+               }
+
             } else if (strlen(cmd_buffer) == 0) {
                printf("> ");
                continue;
+
             } else {
                printf("unknown command\n");
             }
