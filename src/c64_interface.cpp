@@ -10,8 +10,8 @@ void c64_reset(void) {
    gpio_put(RESET, 1);
 }
 
-void c64_set_exrom_game(bool exrom, bool game) {
+void c64_set_exrom_game(int exrom, int game) {
 
    gpio_put(EXROM, exrom);
-   gpio_put(GAME, exrom);
+   gpio_put(GAME, game);
 }

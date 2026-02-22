@@ -24,9 +24,11 @@ void board_setup(void) {
    gpio_set_dir(ROMH, GPIO_IN);
 
    gpio_init(IO1);
+   gpio_disable_pulls(IO1);
    gpio_set_dir(IO1, GPIO_IN);
 
    gpio_init(IO2);
+   gpio_disable_pulls(IO1);
    gpio_set_dir(IO2, GPIO_IN);
 
    gpio_init(RW);
@@ -46,4 +48,15 @@ void board_setup(void) {
 
    gpio_init_mask(ADDR_GPIO_MASK | DATA_GPIO_MASK);
    gpio_set_dir_in_masked(ADDR_GPIO_MASK | DATA_GPIO_MASK);
+
+   // set DATA lines (D0...D7) as input
+   SET_DATA_MODE_IN
+}
+
+void set_led_on(void) {
+   gpio_put(LED, 1);
+}
+
+void set_led_off(void) {
+   gpio_put(LED, 0);
 }

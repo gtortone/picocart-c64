@@ -27,6 +27,9 @@
 #define UART_TX      46
 #define UART_RX      47
 
+#define IO1_MASK     ((uint64_t)1 << IO1)
+#define IO2_MASK     ((uint64_t)1 << IO2)
+#define PHI2_MASK    ((uint64_t)1 << PHI2)
 #define ROML_MASK    ((uint64_t)1 << ROML)
 #define ROMH_MASK    ((uint64_t)1 << ROMH)
 #define RW_MASK      ((uint64_t)1 << RW)
@@ -46,5 +49,8 @@
 #define PSRAM_BASE 0x11000000
 
 void board_setup(void);
+
+void set_led_on(void);
+void set_led_off(void);
 
 #endif
