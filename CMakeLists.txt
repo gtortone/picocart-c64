@@ -10,7 +10,7 @@ project(${PROJECT} C CXX ASM)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
 
-#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O2")
+#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3")
 
 # Debug
 # set(CMAKE_BUILD_TYPE Debug)
@@ -28,7 +28,7 @@ file(GLOB HEADERS ${HEADER_DIR}/*.h)
 
 add_executable(${PROJECT} ${SOURCES} ${HEADERS})
 
-#pico_generate_pio_header(${PROJECT} ${CMAKE_CURRENT_LIST_DIR}/c64_roml.pio)
+#pico_generate_pio_header(${PROJECT} ${CMAKE_CURRENT_LIST_DIR}/src/ultimax.pio)
 
 target_include_directories(${PROJECT} PRIVATE ${HEADER_DIR})
 
@@ -36,6 +36,7 @@ target_link_libraries(${PROJECT}
    pico_stdlib 
    pico_stdio_uart
    pico_multicore
+   hardware_pio
 )
 
 # print statistics

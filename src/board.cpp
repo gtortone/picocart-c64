@@ -1,6 +1,7 @@
 
 #include "pico/stdlib.h"
 #include "hardware/clocks.h"
+#include "hardware/vreg.h"
 
 #include "board.h"
 
@@ -8,6 +9,9 @@ void board_setup(void) {
 
    // overclock
    set_sys_clock_khz(250000, true);
+   //vreg_set_voltage(VREG_VOLTAGE_1_15);
+   //sleep_ms(300);
+   //set_sys_clock_khz(300000, true);
 
    gpio_set_function(UART_TX, UART_FUNCSEL_NUM(UART_ID, UART_TX));
    gpio_set_function(UART_RX, UART_FUNCSEL_NUM(UART_ID, UART_RX));
@@ -31,7 +35,7 @@ void board_setup(void) {
    gpio_set_dir(IO1, GPIO_IN);
 
    gpio_init(IO2);
-   gpio_disable_pulls(IO1);
+   gpio_disable_pulls(IO2);
    gpio_set_dir(IO2, GPIO_IN);
 
    gpio_init(RW);
@@ -58,8 +62,10 @@ void board_setup(void) {
 
    gpio_init_mask(ADDR_GPIO_MASK | DATA_GPIO_MASK);
    gpio_set_dir_in_masked(ADDR_GPIO_MASK | DATA_GPIO_MASK);
+
    for(int i=PINROMADDR; i<ADDRWIDTH; i++)
       gpio_disable_pulls(i);
+
    for(int i=PINROMDATA; i<DATAWIDTH; i++) {
       gpio_disable_pulls(PINROMDATA+i);
       gpio_set_slew_rate(PINROMDATA+i, GPIO_SLEW_RATE_FAST);

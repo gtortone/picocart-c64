@@ -12,8 +12,7 @@
 #include "utils.h"
 
 // Ultimax cartridges
-#include "carts/kickman-cart.h"
-//#include "carts/kickman-padded-cart.h"
+//#include "carts/kickman-cart.h"
 //#include "carts/slalom-cart.h"
 //#include "carts/music-cart.h"
 //#include "carts/visible-cart.h"
@@ -34,7 +33,7 @@
 //#include "carts/arkanoid-cart.h"
 //#include "carts/attack-cart.h"
 //#include "carts/mission-cart.h"
-//#include "carts/zynaps-cart.h"
+#include "carts/zynaps-cart.h"
 
 #define CMD_BUFFER_SIZE 64
 
@@ -45,7 +44,7 @@ void run_cart_16k(void);
 void run_cart_ultimax(void);
 void run_cart_magic_desk(void);
 
-int main() {
+int main(void) {
    
    char cmd_buffer[CMD_BUFFER_SIZE];
    uint8_t cmd_index = 0;
@@ -56,16 +55,16 @@ int main() {
    multicore_reset_core1();
 
    //c64_set_exrom_game(0, 0);         // run_cart_16k
-   //c64_set_exrom_game(0, 1);         // run_cart_8k / run_cart_magic_desk
-   c64_set_exrom_game(1, 0);         // run_cart_ultimax 
+   c64_set_exrom_game(0, 1);         // run_cart_8k / run_cart_magic_desk
+   //c64_set_exrom_game(1, 0);         // run_cart_ultimax 
    //c64_set_exrom_game(1, 1);         // <no cartridge>
    
    c64_hold_reset();
 
    //multicore_launch_core1(run_cart_8k);
    //multicore_launch_core1(run_cart_16k);
-   multicore_launch_core1(run_cart_ultimax);
-   //multicore_launch_core1(run_cart_magic_desk);
+   //multicore_launch_core1(run_cart_ultimax);
+   multicore_launch_core1(run_cart_magic_desk);
 
    c64_release_reset();
 
@@ -128,17 +127,15 @@ void __time_critical_func(run_cart_8k)(void) {
 
    while(1) {
 
-      wait_high(PHI2);
-
       control = gpio_get_all64();
       addr = (control & ADDR_GPIO_MASK);
       COMPILER_BARRIER();
-      
+     
       if( !(control & ROML_MASK) ) {
          if (control & RW_MASK) {
             DATA_OUT(cart[addr & 0x1FFF]);
             SET_DATA_MODE_OUT
-            wait_low(PHI2);
+            wait_high(ROML);
             SET_DATA_MODE_IN
          } 
       }
@@ -156,8 +153,6 @@ void __time_critical_func(run_cart_16k)(void) {
 
    while(1) {
 
-      wait_high(PHI2);
-
       control = gpio_get_all64();
       addr = (control & ADDR_GPIO_MASK);
       COMPILER_BARRIER();
@@ -167,7 +162,8 @@ void __time_critical_func(run_cart_16k)(void) {
          if (control & RW_MASK) {
             DATA_OUT(cart[addr & 0x3FFF]);
             SET_DATA_MODE_OUT
-            wait_low(PHI2);
+            wait_high(ROML);
+            wait_high(ROMH);
             SET_DATA_MODE_IN
          } 
       }
@@ -186,36 +182,35 @@ void __time_critical_func(run_cart_16k)(void) {
 
 void __time_critical_func(run_cart_ultimax)(void) {
 
-   volatile uint64_t control;
+   volatile uint32_t control;
    volatile uint32_t addr;
+   int mask = 0x1FFF;
+
+   if(sizeof(cart) > 0x2000)
+      mask = 0x3FFF;
 
    uint32_t irqstatus = save_and_disable_interrupts();
 
+
    while(1) {
 
-      wait_high(PHI2);
-
-      control = gpio_get_all64();
+      control = gpio_get_all();
       addr = (control & ADDR_GPIO_MASK);
       COMPILER_BARRIER();
 
       if( !(control & ROML_MASK) ) {
 
-         if (control & RW_MASK) {
-            DATA_OUT(cart[addr & 0x1FFF]);
+            DATA_OUT(cart[addr & mask]);
             SET_DATA_MODE_OUT
-            wait_low(PHI2);
+            wait_high(ROML);
             SET_DATA_MODE_IN
-         } 
 
-      } else if( !(control & ROMH_MASK) ) { 
+      } else if( !(control & ROMH_MASK) ) {
 
-         if (control & RW_MASK) {
-            DATA_OUT(cart[addr & 0x1FFF]);
+            DATA_OUT(cart[addr & mask]);
             SET_DATA_MODE_OUT
-            wait_low(PHI2);
+            wait_high(ROMH);
             SET_DATA_MODE_IN
-         }
       }
    } // end loop
 }
@@ -233,8 +228,6 @@ void __time_critical_func(run_cart_magic_desk)(void) {
 
    while(1) {
 
-      wait_high(PHI2);
-
       control = gpio_get_all64();
       addr = (control & ADDR_GPIO_MASK);
       COMPILER_BARRIER();
@@ -246,7 +239,7 @@ void __time_critical_func(run_cart_magic_desk)(void) {
             addr += (bank * 0x2000);
             DATA_OUT(cart[addr]);
             SET_DATA_MODE_OUT
-            wait_low(PHI2);
+            wait_high(ROML);
             SET_DATA_MODE_IN
          }
 

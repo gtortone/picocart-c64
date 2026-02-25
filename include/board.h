@@ -17,11 +17,11 @@
 #define PHI2         26
 #define ROML         27
 #define ROMH         28
-#define RESET        29
+#define BA           29
 #define EXROM        30
 #define GAME         31
 #define RW           32
-#define BA           33
+#define RESET        33
 #define LED          39
 
 #define UART_ID      uart0
@@ -33,8 +33,8 @@
 #define PHI2_MASK    ((uint64_t)1 << PHI2)
 #define ROML_MASK    ((uint64_t)1 << ROML)
 #define ROMH_MASK    ((uint64_t)1 << ROMH)
-#define RW_MASK      ((uint64_t)1 << RW)
 #define BA_MASK      ((uint64_t)1 << BA)
+#define RW_MASK      ((uint64_t)1 << RW)
 
 // masks
 #define ADDR_GPIO_MASK     (0xFFFF << PINROMADDR)
