@@ -38,9 +38,10 @@ target_link_libraries(${PROJECT}
    pico_multicore
 )
 
-if (PICO_CYW43_SUPPORTED)
-    target_link_libraries(${PROJECT} pico_cyw43_arch_none)
-endif()
+# print statistics
+target_link_options(${PROJECT_NAME} PRIVATE
+    -Wl,--print-memory-usage
+)
 
 # enable uart output
 pico_enable_stdio_usb(${PROJECT} 0)
