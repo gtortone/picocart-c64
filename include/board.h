@@ -22,6 +22,14 @@
 #define GAME         31
 #define RW           32
 #define RESET        33
+
+// SD pins
+#define SD_SPI_PORT  spi0
+#define SD_SCK       34
+#define SD_MOSI      35
+#define SD_MISO      36
+#define SD_CS        37
+
 #define LED          39
 
 #define UART_ID      uart0

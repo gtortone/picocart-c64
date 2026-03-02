@@ -20,6 +20,24 @@ pico_sdk_init()
 
 include(/usr/share/pico-sdk/pico_sdk_init.cmake)
 
+# fetch elehobica/pico_fatfs
+include(FetchContent)
+
+set(PICO_FATFS_DIR ${CMAKE_SOURCE_DIR}/lib/no-OS-FatFS-SD-SDIO-SPI-RPi-Pico)
+
+FetchContent_Declare(
+    pico_fatfs
+    GIT_REPOSITORY https://github.com/carlk3/no-OS-FatFS-SD-SDIO-SPI-RPi-Pico
+    GIT_TAG main
+    SOURCE_DIR ${PICO_FATFS_DIR}
+)
+
+FetchContent_MakeAvailable(pico_fatfs)
+
+add_subdirectory(
+    lib/no-OS-FatFS-SD-SDIO-SPI-RPi-Pico/src
+)
+
 set(SOURCE_DIR ${CMAKE_SOURCE_DIR}/src)
 set(HEADER_DIR ${CMAKE_SOURCE_DIR}/include)
 
@@ -36,7 +54,7 @@ target_link_libraries(${PROJECT}
    pico_stdlib 
    pico_stdio_uart
    pico_multicore
-   hardware_pio
+   no-OS-FatFS-SD-SDIO-SPI-RPi-Pico
 )
 
 # print statistics

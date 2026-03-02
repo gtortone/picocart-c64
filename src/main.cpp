@@ -10,9 +10,10 @@
 #include "board.h"
 #include "c64_interface.h"
 #include "utils.h"
+#include "ff.h"
 
 // Ultimax cartridges
-//#include "carts/kickman-cart.h"
+#include "carts/kickman-cart.h"
 //#include "carts/slalom-cart.h"
 //#include "carts/music-cart.h"
 //#include "carts/visible-cart.h"
@@ -33,7 +34,7 @@
 //#include "carts/arkanoid-cart.h"
 //#include "carts/attack-cart.h"
 //#include "carts/mission-cart.h"
-#include "carts/zynaps-cart.h"
+//#include "carts/zynaps-cart.h"
 
 #define CMD_BUFFER_SIZE 64
 
@@ -51,20 +52,24 @@ int main(void) {
 
    board_setup();
 
+   // mount SD
+   FATFS fs;
+   FRESULT fr = f_mount(&fs, "", 1);
+
    // init multicore
    multicore_reset_core1();
 
    //c64_set_exrom_game(0, 0);         // run_cart_16k
-   c64_set_exrom_game(0, 1);         // run_cart_8k / run_cart_magic_desk
-   //c64_set_exrom_game(1, 0);         // run_cart_ultimax 
+   //c64_set_exrom_game(0, 1);         // run_cart_8k / run_cart_magic_desk
+   c64_set_exrom_game(1, 0);         // run_cart_ultimax 
    //c64_set_exrom_game(1, 1);         // <no cartridge>
    
    c64_hold_reset();
 
    //multicore_launch_core1(run_cart_8k);
    //multicore_launch_core1(run_cart_16k);
-   //multicore_launch_core1(run_cart_ultimax);
-   multicore_launch_core1(run_cart_magic_desk);
+   multicore_launch_core1(run_cart_ultimax);
+   //multicore_launch_core1(run_cart_magic_desk);
 
    c64_release_reset();
 
@@ -190,7 +195,6 @@ void __time_critical_func(run_cart_ultimax)(void) {
       mask = 0x3FFF;
 
    uint32_t irqstatus = save_and_disable_interrupts();
-
 
    while(1) {
 
