@@ -25,6 +25,7 @@ void run_cart_16k(void);
 void run_cart_ultimax(void);
 void run_cart_magic_desk(void);
 void run_cart_ocean(void);
+void run_cart_fun_play(void);
 
 CRTHandler crt;
 
@@ -121,7 +122,12 @@ int main(void) {
                      multicore_launch_core1_with_stack(run_cart_magic_desk, core1_stack, CORE1_STACK_SIZE);
                   } else if(crt.type == 5) {
                      // Ocean (5)
+                     printf("cart: Ocean\n");
                      multicore_launch_core1_with_stack(run_cart_ocean, core1_stack, CORE1_STACK_SIZE);
+                  } else if(crt.type == 7) {
+                     // Fun Play (7)
+                     printf("cart: Fun Play\n");
+                     multicore_launch_core1_with_stack(run_cart_fun_play, core1_stack, CORE1_STACK_SIZE);
                   }
                   c64_reset();
                   printf("done\n");
@@ -361,4 +367,52 @@ void __time_critical_func(run_cart_ocean)(void) {
       }
    }  // end loop
 }
+
+//
+
+void __time_critical_func(run_cart_fun_play)(void) {
+
+   volatile uint64_t control;
+   volatile uint32_t addr;
+   volatile uint8_t data;
+   uint8_t bank = 0;
+   uint8_t prev_bank = 0;
+
+   uint32_t irqstatus = save_and_disable_interrupts();
+
+   SET_DATA_MODE_IN
+   while(1) {
+
+      control = gpio_get_all64();
+      addr = (control & ADDR_GPIO_MASK);
+      COMPILER_BARRIER();
+
+      if (control & RW_MASK) {
+         if( !(control & ROML_MASK) ) {
+
+            addr -= 0x8000;
+            addr += (bank * 0x2000);
+            DATA_OUT(cart[addr]);
+            SET_DATA_MODE_OUT
+            wait_high(ROML);
+            SET_DATA_MODE_IN
+         }
+
+      } else {
+         
+         SET_DATA_MODE_IN
+         data = DATA_IN;
+         if( !(control & IO1_MASK) && (addr == 0xDE00) ) {
+            if ( !(data & 0x80)) {
+               c64_set_exrom_game(0, 1);
+               bank = ( (data >> 3) & 0x07 ) | ( (data & 0x01) << 3);
+            } else {
+               c64_set_exrom_game(1, 1);
+            }
+         }
+      }
+   }  // end loop
+}
+
+//
 
