@@ -74,6 +74,10 @@ CRTFileError crt_file_parse(CRTHandler *crt) {
    f_read(&crt->fil, buf, 1, &br);
    crt->game = bool(buf[0]);
    debug && printf("exrom: %d, game: %d\n", crt->exrom, crt->game);
+   
+   // fix Ocean bad EXROM/GAME
+   if(crt->type == 5)
+      crt->exrom = crt->game = 0;
 
    f_read(&crt->fil, buf, 6, &br);
 
