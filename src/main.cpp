@@ -11,79 +11,60 @@
 #include "c64_interface.h"
 #include "utils.h"
 #include "ff.h"
-
-// Ultimax cartridges
-#include "carts/kickman-cart.h"
-//#include "carts/slalom-cart.h"
-//#include "carts/music-cart.h"
-//#include "carts/visible-cart.h"
-
-// 8K cartridges
-//#include "carts/tenpins-cart.h"
-//#include "carts/moondust-cart.h"
-//#include "carts/destest-cart.h"
-//#include "carts/diag-cart.h"
-
-// 16K cartridges
-//#include "carts/toybizarre-cart.h"
-//#include "carts/centipede-cart.h"
-//#include "carts/galaxian-cart.h"
-//#include "carts/moonpatrol-cart.h"
-
-// Magic Desk cartridges
-//#include "carts/arkanoid-cart.h"
-//#include "carts/attack-cart.h"
-//#include "carts/mission-cart.h"
-//#include "carts/zynaps-cart.h"
+#include "crt.h"
 
 #define CMD_BUFFER_SIZE 64
 
 #define COMPILER_BARRIER() asm volatile("" ::: "memory")
+
+#define CORE1_STACK_SIZE 2048
+static uint32_t core1_stack[CORE1_STACK_SIZE];
 
 void run_cart_8k(void);
 void run_cart_16k(void);
 void run_cart_ultimax(void);
 void run_cart_magic_desk(void);
 
+CRTHandler crt;
+
+uint8_t __not_in_flash("cart") cart[128 * 1024];
+
 int main(void) {
    
    char cmd_buffer[CMD_BUFFER_SIZE];
    uint8_t cmd_index = 0;
+   uint8_t rc;
 
    board_setup();
+
+   c64_set_exrom_game(1, 1);         // <no cartridge>
+   c64_reset();
 
    // mount SD
    FATFS fs;
    FRESULT fr = f_mount(&fs, "", 1);
 
-   // init multicore
-   multicore_reset_core1();
-
-   //c64_set_exrom_game(0, 0);         // run_cart_16k
-   //c64_set_exrom_game(0, 1);         // run_cart_8k / run_cart_magic_desk
-   c64_set_exrom_game(1, 0);         // run_cart_ultimax 
-   //c64_set_exrom_game(1, 1);         // <no cartridge>
+   if(fr != FR_OK)
+      printf("E: SD mount failed\n");
    
-   c64_hold_reset();
-
-   //multicore_launch_core1(run_cart_8k);
-   //multicore_launch_core1(run_cart_16k);
-   multicore_launch_core1(run_cart_ultimax);
-   //multicore_launch_core1(run_cart_magic_desk);
-
-   c64_release_reset();
-
    printf("\n\n-- PicoCart-64 shell --\n\n");
    printf("> ");
    while(1) {
       while (uart_is_readable(UART_ID)) {
          char c = uart_getc(UART_ID);
 
-         // echo
-         if (c == '\r') {
+         if (c == '\r') {     // cr + lf
             uart_putc(UART_ID, c);
             uart_putc(UART_ID, '\n');
-         } else uart_putc(UART_ID, c);
+         } else if (c == '\b') {   // backspace or del
+            if (cmd_index > 0) {
+               cmd_index--;
+               uart_putc(UART_ID, '\b');
+               uart_putc(UART_ID, ' ');
+               uart_putc(UART_ID, '\b');
+            } 
+            continue;
+         } else uart_putc(UART_ID, c);    // echo
 
          // process command
          if (c == '\r' || c == '\n') {
@@ -92,8 +73,8 @@ int main(void) {
             
             char *token = strtok(cmd_buffer, " ");
 
-            // reset command
             if (strcmp(token, "reset") == 0) {
+               // reset command
                // parameter: [cpu], [c64]
                token = strtok(NULL, " ");
                if (strcmp(token, "c64") == 0) {
@@ -105,15 +86,80 @@ int main(void) {
                } else {
                   printf("reset [c64 | pico]\n");
                }
+            } else if (strcmp(token, "load") == 0) {
+               // load file
+               // parameter: <filename>
+               token = strtok(NULL, " ");
+               if((rc = crt_file_open(&crt, token)) == FILE_OK) {
+                  // build raw cart
+                  crt_to_bin(crt, cart);
+                  // configure C64
+                  printf("EXROM: %d, GAME: %d\n", crt.exrom, crt.game);
+                  multicore_reset_core1();
+                  c64_set_exrom_game(crt.exrom, crt.game);
+                  printf("CRT size: %d\n", crt.size);
+                  if(crt.type == 0) {
+                     // normal cartridge (0)
+                     if(crt.exrom == 1) {
+                        // Ultimax
+                        printf("cart: Ultimax\n");
+                        multicore_launch_core1_with_stack(run_cart_ultimax, core1_stack, CORE1_STACK_SIZE);
+                     } else {
+                        // 8K / 16K
+                        if(crt.size > 8192) {
+                           printf("cart: normal 16K\n");
+                           multicore_launch_core1_with_stack(run_cart_16k, core1_stack, CORE1_STACK_SIZE);
+                        } else {
+                           printf("cart: normal 8K\n");
+                           multicore_launch_core1_with_stack(run_cart_8k, core1_stack, CORE1_STACK_SIZE);
+                        }
+                     }
+                  } else if(crt.type == 19) {
+                     // Magic Desk (19)
+                     printf("cart: Magic Desk\n");
+                     multicore_launch_core1_with_stack(run_cart_magic_desk, core1_stack, CORE1_STACK_SIZE);
+                  }
+                  c64_reset();
+                  printf("done\n");
+                  crt_file_close(&crt);
+               } else {
+                  printf("E: %s\n", CRTFileErrorStrings[rc]);
+               }
+            } else if (strcmp(token, "ls") == 0) {
+               // list files/directories
+               FRESULT res;
+               DIR dir;
+               FILINFO fno;
+               res = f_opendir(&dir, "/");
+               if (res == FR_OK) {
+                  while (1) {
+                     if ( (f_readdir(&dir, &fno) != FR_OK) || (fno.fname[0] == 0) )
+                        break;
+                     if(fno.fattrib & (AM_HID | AM_SYS))
+                        continue;
+                     char *name = *fno.fname ? fno.fname : fno.fname;
+                     if (fno.fattrib & AM_DIR)
+                        printf("[DIR] %s\n", name);
+                     else
+                        printf("[FILE] %s (%lu bytes)\n", name, fno.fsize);
+                  }
+                  f_closedir(&dir);
+               } else {
+                  printf("E: ls error %d\n", res);
+               }
             } else if (strcmp(token, "test") == 0) {
-               printf("test\n");
+               printf("done");
+               sleep_ms(2000);
+               uart_putc_raw(uart0, 0x08);
+               sleep_ms(2000);
             } else if (strlen(cmd_buffer) == 0) {
                printf("> ");
                continue;
             } else {
-               printf("unknown command\n");
+               printf("%s: unknown command\n", cmd_buffer);
             }
-            cmd_index = 0; printf("> ");
+            cmd_index = 0;
+            printf("> ");
          } else if (cmd_index < CMD_BUFFER_SIZE - 1) {
             cmd_buffer[cmd_index++] = c;
          }
@@ -189,10 +235,7 @@ void __time_critical_func(run_cart_ultimax)(void) {
 
    volatile uint32_t control;
    volatile uint32_t addr;
-   int mask = 0x1FFF;
-
-   if(sizeof(cart) > 0x2000)
-      mask = 0x3FFF;
+   int mask = (crt.size - 1);
 
    uint32_t irqstatus = save_and_disable_interrupts();
 

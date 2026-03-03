@@ -13,7 +13,7 @@ set(CMAKE_CXX_STANDARD 17)
 #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3")
 
 # Debug
-# set(CMAKE_BUILD_TYPE Debug)
+#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g")
 
 # Initialize the SDK
 pico_sdk_init()
@@ -68,4 +68,3 @@ pico_enable_stdio_uart(${PROJECT} 1)
 
 # create map/bin/hex file etc.
 pico_add_extra_outputs(${PROJECT})
-
