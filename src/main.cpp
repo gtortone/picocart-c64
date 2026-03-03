@@ -26,6 +26,7 @@ void run_cart_ultimax(void);
 void run_cart_magic_desk(void);
 void run_cart_ocean(void);
 void run_cart_fun_play(void);
+void run_cart_super_games(void);
 
 CRTHandler crt;
 
@@ -128,6 +129,10 @@ int main(void) {
                      // Fun Play (7)
                      printf("cart: Fun Play\n");
                      multicore_launch_core1_with_stack(run_cart_fun_play, core1_stack, CORE1_STACK_SIZE);
+                  } else if(crt.type == 8) {
+                     // Super Games (8)
+                     printf("cart: Super Games\n");
+                     multicore_launch_core1_with_stack(run_cart_super_games, core1_stack, CORE1_STACK_SIZE);
                   }
                   c64_reset();
                   printf("done\n");
@@ -376,7 +381,6 @@ void __time_critical_func(run_cart_fun_play)(void) {
    volatile uint32_t addr;
    volatile uint8_t data;
    uint8_t bank = 0;
-   uint8_t prev_bank = 0;
 
    uint32_t irqstatus = save_and_disable_interrupts();
 
@@ -415,4 +419,55 @@ void __time_critical_func(run_cart_fun_play)(void) {
 }
 
 //
+
+void __time_critical_func(run_cart_super_games)(void) {
+
+   volatile uint64_t control;
+   volatile uint32_t addr;
+   volatile uint8_t data;
+   uint8_t bank = 0;
+   bool disable = false;
+
+   uint32_t irqstatus = save_and_disable_interrupts();
+
+   SET_DATA_MODE_IN
+   while(1) {
+
+      control = gpio_get_all64();
+      addr = (control & ADDR_GPIO_MASK);
+      COMPILER_BARRIER();
+
+      if (control & RW_MASK) {
+         if( !(control & ROML_MASK) || !(control & ROMH_MASK) ) {
+
+            addr -= 0x8000;
+            addr += (bank * 0x4000);
+            DATA_OUT(cart[addr]);
+            SET_DATA_MODE_OUT
+            wait_high(ROML);
+            wait_high(ROMH);
+            SET_DATA_MODE_IN
+         }
+
+      } else {
+         
+         SET_DATA_MODE_IN
+         data = DATA_IN;
+         if( !(control & IO2_MASK) && (addr == 0xDF00) && !disable) {
+            if( !(data & 0x04) ) {
+               c64_set_exrom_game(0, 0);
+               bank = data & 0x03;
+            } else {
+               c64_set_exrom_game(1, 1);
+            }
+
+            if(data & 0x08)
+               disable = true;
+         }
+      }
+   }  // end loop
+}
+
+//
+
 
