@@ -1,11 +1,16 @@
 #ifndef C64_INTERFACE_
 #define C64_INTERFACE_
 
+#include "board.h"
+
 void c64_hold_reset(int ms=250);
 void c64_release_reset(void);
 void c64_reset(void);
 
-void c64_set_exrom_game(int exrom, int game);
+inline void c64_set_exrom_game(bool exrom, bool game) {
+   gpio_put(EXROM, !exrom);
+   gpio_put(GAME, !game);
+}
 
 inline void wait_low(int line) {
    while (gpio_get(line))

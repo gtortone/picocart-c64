@@ -50,11 +50,9 @@ void board_setup(void) {
    gpio_set_dir(LED, GPIO_OUT);
 
    gpio_init(EXROM);
-   gpio_disable_pulls(EXROM);
    gpio_set_dir(EXROM, GPIO_OUT);
 
    gpio_init(GAME);
-   gpio_disable_pulls(GAME);
    gpio_set_dir(GAME, GPIO_OUT);
 
    gpio_init(RESET);

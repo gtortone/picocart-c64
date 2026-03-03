@@ -18,10 +18,10 @@
 #define ROML         27
 #define ROMH         28
 #define BA           29
-#define EXROM        30
-#define GAME         31
+#define EXROM        30    // inverted logic
+#define GAME         31    // inverted logic
 #define RW           32
-#define RESET        33
+#define RESET        33    // inverted logic
 
 // SD pins
 #define SD_SPI_PORT  spi0

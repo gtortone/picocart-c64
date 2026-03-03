@@ -176,6 +176,7 @@ void __time_critical_func(run_cart_8k)(void) {
 
    uint32_t irqstatus = save_and_disable_interrupts();
 
+   SET_DATA_MODE_IN
    while(1) {
 
       control = gpio_get_all64();
@@ -202,6 +203,7 @@ void __time_critical_func(run_cart_16k)(void) {
 
    uint32_t irqstatus = save_and_disable_interrupts();
 
+   SET_DATA_MODE_IN
    while(1) {
 
       control = gpio_get_all64();
@@ -239,6 +241,7 @@ void __time_critical_func(run_cart_ultimax)(void) {
 
    uint32_t irqstatus = save_and_disable_interrupts();
 
+   SET_DATA_MODE_IN
    while(1) {
 
       control = gpio_get_all();
@@ -273,6 +276,7 @@ void __time_critical_func(run_cart_magic_desk)(void) {
 
    uint32_t irqstatus = save_and_disable_interrupts();
 
+   SET_DATA_MODE_IN
    while(1) {
 
       control = gpio_get_all64();
