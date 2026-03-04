@@ -1,0 +1,93 @@
+
+I2C address:       0x50
+
+registers:
+
+   0x00        page size         (e.g. 64 bytes)
+
+   0x01       
+
+
+I2C messages:
+
+   S = start
+
+   DA = device address
+
+   R = read
+   W = write
+
+   STOP = stop
+
+   note: ACK omitted (each 8 bits transmitted/received)
+
+byte write (opcode 0x00)
+------------------------
+
+   S  DA    W     0x00     addr[2]     addr[1]     addr[0]     data     STOP
+
+
+page write (opcode 0x01)
+------------------------
+
+   S  DA    W     0x01     addr[2]     addr[1]     addr[0]     data[0]   . . .  data[63]  STOP
+
+
+current address read (opcode 0x02)
+----------------------------------
+
+   S  DA    R     0x02     addr[2]     addr[1]     addr[0]     STOP
+
+
+random read (opcode 0x03)
+-------------------------
+
+   S  DA    W     0x03     addr[2]     addr[1]     addr[0]  
+
+   S  DA    R     data     STOP
+
+
+sequential read (opcode 0x04)
+-----------------------------
+
+   S  DA    R     0x04     data[0]   . . .  data[63]  STOP
+
+
+register read (opcode 0x10)
+---------------------------
+
+   S  DA    W     0x10     reg
+
+   S  DA    R     data     STOP
+
+
+register write (opcode 0x11)
+----------------------------
+
+   S  DA    W     0x11     reg   data  STOP
+
+
+
+Python examples
+---------------
+
+
+from pyftdi.i2c import I2cController
+
+i2c = I2cController()
+i2c.configure('ftdi://ftdi:2232h/1')
+
+slave = i2c.get_port(0x50)
+
+
+#
+# register read
+#
+slave.write([0x10, 0x00])        # opcode: 0x10    register: 0x00
+data = slave.read(1)
+print(int(data[0]))
+
+# 
+# register write
+#
+slave.write([0x11, 0x01, 0x22])

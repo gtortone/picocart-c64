@@ -2,6 +2,7 @@
 #define BOARD_H_
 
 #include "hardware/structs/sio.h"
+#include <hardware/i2c.h>
 
 // ADDR GPIO pins       :     GP0 - GP15
 #define PINROMADDR    0
@@ -32,9 +33,17 @@
 
 #define LED          39
 
+// I2C pins
+#define I2C_PORT     i2c0
+#define I2C_ADDR     0x50
+#define I2C_SDA      40
+#define I2C_SCL      41
+#define I2C_BAUDRATE 400000
+
 #define UART_ID      uart0
 #define UART_TX      46
 #define UART_RX      47
+#define UART_BAUDRATE 115200
 
 #define IO1_MASK     ((uint64_t)1 << IO1)
 #define IO2_MASK     ((uint64_t)1 << IO2)

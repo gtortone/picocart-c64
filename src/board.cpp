@@ -15,8 +15,18 @@ void board_setup(void) {
 
    gpio_set_function(UART_TX, UART_FUNCSEL_NUM(UART_ID, UART_TX));
    gpio_set_function(UART_RX, UART_FUNCSEL_NUM(UART_ID, UART_RX));
-   uart_init(UART_ID, 115200);
+   uart_init(UART_ID, UART_BAUDRATE);
    stdio_uart_init_full(UART_ID, 115200, UART_TX, UART_RX);
+
+   gpio_init(I2C_SDA);
+   gpio_set_function(I2C_SDA, GPIO_FUNC_I2C);
+   gpio_disable_pulls(I2C_SDA);
+
+   gpio_init(I2C_SCL);
+   gpio_set_function(I2C_SCL, GPIO_FUNC_I2C);
+   gpio_disable_pulls(I2C_SCL);
+
+   i2c_init(I2C_PORT, I2C_BAUDRATE);
 
    gpio_init(PHI2);
    gpio_disable_pulls(PHI2);

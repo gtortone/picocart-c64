@@ -54,6 +54,8 @@ target_link_libraries(${PROJECT}
    pico_stdlib 
    pico_stdio_uart
    pico_multicore
+   pico_i2c_slave
+   hardware_i2c
    no-OS-FatFS-SD-SDIO-SPI-RPi-Pico
 )
 

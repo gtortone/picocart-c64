@@ -4,10 +4,14 @@
 #include "pico/stdlib.h"
 #include "pico/multicore.h"
 #include "pico/stdio_uart.h"
+#include "pico/i2c_slave.h"
 #include "hardware/clocks.h"
 #include "hardware/watchdog.h"
+#include "hardware/i2c.h"
+#include "hardware/irq.h"
 
 #include "board.h"
+#include "i2c_handler.h"
 #include "c64_interface.h"
 #include "utils.h"
 #include "ff.h"
@@ -32,6 +36,8 @@ CRTHandler crt;
 
 uint8_t __not_in_flash("cart") cart[384 * 1024];
 
+//
+
 int main(void) {
    
    char cmd_buffer[CMD_BUFFER_SIZE];
@@ -49,7 +55,11 @@ int main(void) {
 
    if(fr != FR_OK)
       printf("E: SD mount failed\n");
-   
+
+   // setup I2C irq handler
+   i2c_slave_init(i2c0, I2C_ADDR, &i2c_slave_handler);
+   i2c_init_regspace();
+
    printf("\n\n-- PicoCart-64 shell --\n\n");
    printf("> ");
    while(1) {
