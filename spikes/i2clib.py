@@ -7,6 +7,10 @@ from time import sleep
 MAX_RETRIES = 3
 DELAY_BETWEEN_RETRIES = 0.02
 
+i2c = I2cController()
+i2c.configure('ftdi://ftdi:2232h/1', frequency=400000)
+slave = i2c.get_port(0x50)
+
 def crc16_ccitt(data, as_tuple=False):
     crc = 0xFFFF
     for b in data:
@@ -70,7 +74,7 @@ def validate_i2c_response(frame: bytes, seq = None):
     if crc_rx != crc_calc:
         return {"valid": False, "error": "CRC mismatch"}
 
-    if cmd >= 0xC0:
+    if cmd == 0xC0:
         error_code = data[0] if length >= 1 else None
         return {
             "valid": True,
@@ -94,7 +98,6 @@ def send_command(seq, cmd, payload=[], resp_max_len=32):
         try:
             # send command
             slave.write(list(frame))
-            sleep(DELAY_BETWEEN_RETRIES)
             
             # read 4 bytes to setup len
             header = slave.read(4)
@@ -133,20 +136,36 @@ def ping():
 def led(value):
     return send_command(get_seq(), 0x70, [value])
 
+def read_register(regaddr):
+    return send_command(get_seq(), 0x02, [regaddr])
+
+def write_register(regaddr, value):
+    return send_command(get_seq(), 0x03, [regaddr, value])
+
+def read_memory(addr):
+    return send_command(get_seq(), 0x12, [
+        (addr & 0xFF0000) >> 16,
+        (addr & 0x00FF00) >> 8,
+        (addr & 0x0000FF)
+    ])
+
+def write_memory(addr, value):
+    return send_command(get_seq(), 0x13, [
+        (addr & 0xFF0000) >> 16,
+        (addr & 0x00FF00) >> 8,
+        (addr & 0x0000FF),
+        value
+    ])
+
+def write_memory_buffer(addr, data):
+    return send_command(get_seq(), 0x23, [
+        (addr & 0xFF0000) >> 16,
+        (addr & 0x00FF00) >> 8,
+        (addr & 0x0000FF),
+        *data 
+    ])
+
 def dump_registers():
     for i in range(0,10):
         print(f'reg {i}: {read_register(i)}')
-
-# main
-
-i2c = I2cController()
-i2c.configure('ftdi://ftdi:2232h/1', frequency=400000)
-slave = i2c.get_port(0x50)
-
-# commands 
-
-while True:
-    print(f"ping: {ping()}")
-    print(f"led on: {led(1)}")
-    print(f"led off: {led(0)}")
 

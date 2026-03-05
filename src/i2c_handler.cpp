@@ -6,8 +6,8 @@
 
 #include "board.h"
 
-#define SOF 0xAA
-#define FRAME_ERR 0xC0
+#define SOF          0xAA
+#define FRAME_ERR    0xC0
 
 #define ERR_CRC      0x01  // wrong CRC
 #define ERR_UNK      0x02  // unknown command
@@ -15,10 +15,14 @@
 #define ERR_BUSY     0x04  // slave busy
 #define ERR_DENY     0x05  // access denied
 #define ERR_INDEX    0x06  // index out of range
+#define ERR_NPARAMS  0x07  // number of params not enough
 
-#define MAX_PAYLOAD 24
-#define RX_BUF_SIZE 32
-#define TX_BUF_SIZE 32
+//#define MAX_PAYLOAD 24
+//#define RX_BUF_SIZE 32
+//#define TX_BUF_SIZE 32
+#define MAX_PAYLOAD 650
+#define RX_BUF_SIZE 1024
+#define TX_BUF_SIZE 1024
 #define MAX_REGISTERS_NUM 255
 
 static uint8_t rxbuf[RX_BUF_SIZE];
@@ -29,6 +33,8 @@ static volatile int tx_len = 0;
 static volatile int tx_index = 0;
 
 static uint8_t regs[MAX_REGISTERS_NUM];
+
+extern uint8_t *hram;
 
 //
 
@@ -60,6 +66,8 @@ uint16_t crc16_ccitt(uint8_t *data, int len) {
 
 int handle_command(uint8_t cmd, uint8_t *data, uint8_t len, uint8_t *resp, int *error) {
 
+   uint32_t addr;
+
    switch(cmd) {
 
       case 0x01: // ping
@@ -73,9 +81,73 @@ int handle_command(uint8_t cmd, uint8_t *data, uint8_t len, uint8_t *resp, int *
                *error = 1;
                return 1;
             }
-            resp[0] = regs[data[0]];
+         resp[0] = regs[data[0]];
          return 1;
-      
+
+      case 0x03: // write register
+         if(len >= 2) {
+            if(data[0] > MAX_REGISTERS_NUM) {
+               resp[0] = ERR_INDEX;
+               *error = 1;
+               return 1;
+            }
+            regs[data[0]] = data[1];
+         } else {
+               resp[0] = ERR_NPARAMS;
+               *error = 1;
+               return 1;
+         }
+         return 0;
+
+      case 0x12: // read cartridge location
+         if(len >= 3) {
+            addr = (data[0] << 16) | (data[1] << 8) | data[2];
+            if(addr > ROM_SIZE) {
+               resp[0] = ERR_INDEX;
+               *error = 1;
+               return 1;
+            }
+         } else {
+            resp[0] = ERR_NPARAMS;
+            *error = 1;
+            return 1;
+         }
+         resp[0] = hram[addr];
+         return 1;
+
+      case 0x13: // write cartridge location
+         if(len >= 4) {
+            addr = (data[0] << 16) | (data[1] << 8) | data[2];
+            if(addr > ROM_SIZE) {
+               resp[0] = ERR_INDEX;
+               *error = 1;
+               return 1;
+            }
+         } else {
+            resp[0] = ERR_NPARAMS;
+            *error = 1;
+            return 1;
+         }
+         hram[addr] = data[3];
+         return 0;
+
+      case 0x23: // write cartridge buffer
+         if(len >= 4) {
+            addr = (data[0] << 16) | (data[1] << 8) | data[2];
+            if(addr > ROM_SIZE) {
+               resp[0] = ERR_INDEX;
+               *error = 1;
+               return 1;
+            }
+         } else {
+            resp[0] = ERR_NPARAMS;
+            *error = 1;
+            return 1;
+         }
+         for(int i=3; i<len; i++)
+            hram[addr+i-3] = data[i];
+         return 0;
+
       case 0x70: // set led
          if(len >= 1)
             gpio_put(LED, data[0]);

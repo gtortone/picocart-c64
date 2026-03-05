@@ -55,6 +55,8 @@ typedef struct {
 CRTFileError crt_file_open(CRTHandler *crt, const char *filename);
 CRTFileError crt_file_close(CRTHandler *crt);
 CRTFileError crt_file_parse(CRTHandler *crt);
-void crt_to_bin(CRTHandler crt, uint8_t *data);
+CRTFileError crt_buffer_parse(CRTHandler *crt, uint8_t *buffer);
+void crt_file_to_bin(CRTHandler crt, uint8_t *data);
+void crt_buffer_to_bin(CRTHandler crt, uint8_t *buffer, uint8_t *data);
 
 #endif

@@ -2,6 +2,11 @@
 #include "pico/stdlib.h"
 #include "hardware/clocks.h"
 #include "hardware/vreg.h"
+#include "hardware/structs/xip.h"
+
+#include "hardware/structs/clocks.h"
+#include "hardware/structs/pll.h"
+#include "hardware/structs/xip_ctrl.h"
 
 #include "board.h"
 
@@ -17,6 +22,10 @@ void board_setup(void) {
    gpio_set_function(UART_RX, UART_FUNCSEL_NUM(UART_ID, UART_RX));
    uart_init(UART_ID, UART_BAUDRATE);
    stdio_uart_init_full(UART_ID, 115200, UART_TX, UART_RX);
+
+   // configure PSRAM
+   gpio_set_function(PSRAM_CS, GPIO_FUNC_XIP_CS1); // CS for PSRAM
+	xip_ctrl_hw->ctrl |= XIP_CTRL_WRITABLE_M1_BITS;
 
    gpio_init(I2C_SDA);
    gpio_set_function(I2C_SDA, GPIO_FUNC_I2C);

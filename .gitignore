@@ -43,3 +43,4 @@
 build/
 
 lib/*
+spikes/__pycache__

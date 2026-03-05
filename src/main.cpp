@@ -34,7 +34,9 @@ void run_cart_super_games(void);
 
 CRTHandler crt;
 
-uint8_t __not_in_flash("cart") cart[384 * 1024];
+uint8_t __not_in_flash("cart") cart[ROM_SIZE];
+
+uint8_t *hram;
 
 //
 
@@ -49,6 +51,9 @@ int main(void) {
    c64_set_exrom_game(1, 1);         // <no cartridge>
    c64_reset();
 
+   // create PSRAM area
+   hram = (uint8_t *)PSRAM_BASE;
+   
    // mount SD
    FATFS fs;
    FRESULT fr = f_mount(&fs, "", 1);
@@ -105,7 +110,7 @@ int main(void) {
                token = strtok(NULL, " ");
                if((rc = crt_file_open(&crt, token)) == FILE_OK) {
                   // build raw cart
-                  crt_to_bin(crt, cart);
+                  crt_file_to_bin(crt, cart);
                   // configure C64
                   printf("EXROM: %d, GAME: %d\n", crt.exrom, crt.game);
                   multicore_reset_core1();
@@ -173,7 +178,58 @@ int main(void) {
                   printf("E: ls error %d\n", res);
                }
             } else if (strcmp(token, "test") == 0) {
-               i2c_debug();
+               //i2c_debug();
+               for(int i=0; i<16; i++)
+                  printf("cart[%d]: %d (0x%X)\n", i, cart[i], cart[i]);
+               for(int i=0; i<32; i++)
+                  printf("hram[%d]: %d (0x%X)\n", i, hram[i], hram[i]);
+            } else if (strcmp(token, "run") == 0) {
+               if((rc = crt_buffer_parse(&crt, hram)) == FILE_OK) {
+                  // build raw cart
+                  crt_buffer_to_bin(crt, hram, cart);
+                  // configure C64
+                  printf("EXROM: %d, GAME: %d\n", crt.exrom, crt.game);
+                  multicore_reset_core1();
+                  c64_set_exrom_game(crt.exrom, crt.game);
+                  printf("CRT size: %d\n", crt.size);
+                  if(crt.type == 0) {
+                     // normal cartridge (0)
+                     if(crt.exrom == 1) {
+                        // Ultimax
+                        printf("cart: Ultimax\n");
+                        multicore_launch_core1_with_stack(run_cart_ultimax, core1_stack, CORE1_STACK_SIZE);
+                     } else {
+                        // 8K / 16K
+                        if(crt.size > 8192) {
+                           printf("cart: normal 16K\n");
+                           multicore_launch_core1_with_stack(run_cart_16k, core1_stack, CORE1_STACK_SIZE);
+                        } else {
+                           printf("cart: normal 8K\n");
+                           multicore_launch_core1_with_stack(run_cart_8k, core1_stack, CORE1_STACK_SIZE);
+                        }
+                     }
+                  } else if(crt.type == 19) {
+                     // Magic Desk (19)
+                     printf("cart: Magic Desk\n");
+                     multicore_launch_core1_with_stack(run_cart_magic_desk, core1_stack, CORE1_STACK_SIZE);
+                  } else if(crt.type == 5) {
+                     // Ocean (5)
+                     printf("cart: Ocean\n");
+                     multicore_launch_core1_with_stack(run_cart_ocean, core1_stack, CORE1_STACK_SIZE);
+                  } else if(crt.type == 7) {
+                     // Fun Play (7)
+                     printf("cart: Fun Play\n");
+                     multicore_launch_core1_with_stack(run_cart_fun_play, core1_stack, CORE1_STACK_SIZE);
+                  } else if(crt.type == 8) {
+                     // Super Games (8)
+                     printf("cart: Super Games\n");
+                     multicore_launch_core1_with_stack(run_cart_super_games, core1_stack, CORE1_STACK_SIZE);
+                  }
+                  c64_reset();
+                  printf("done\n");
+               } else {
+                  printf("E: %s\n", CRTFileErrorStrings[rc]);
+               }
             } else if (strlen(cmd_buffer) == 0) {
                printf("> ");
                continue;

@@ -41,9 +41,11 @@
 #define I2C_BAUDRATE 400000
 
 #define UART_ID      uart0
+#define UART_RX      45
 #define UART_TX      46
-#define UART_RX      47
 #define UART_BAUDRATE 115200
+
+#define PSRAM_CS     47
 
 #define IO1_MASK     ((uint64_t)1 << IO1)
 #define IO2_MASK     ((uint64_t)1 << IO2)
@@ -65,7 +67,10 @@
 #define DATA_IN ((sio_hw->gpio_in & DATA_GPIO_MASK) >> PINROMDATA)
 #define DATA_IN_BYTE DATA_IN
 
-#define PSRAM_BASE 0x11000000
+#define PSRAM_BASE   0x11000000
+#define PSRAM_SIZE   (2048 * 1024)  // 2 MB
+
+#define ROM_SIZE     (384 * 1024)
 
 void board_setup(void);
 
