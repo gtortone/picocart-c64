@@ -173,10 +173,7 @@ int main(void) {
                   printf("E: ls error %d\n", res);
                }
             } else if (strcmp(token, "test") == 0) {
-               printf("done");
-               sleep_ms(2000);
-               uart_putc_raw(uart0, 0x08);
-               sleep_ms(2000);
+               i2c_debug();
             } else if (strlen(cmd_buffer) == 0) {
                printf("> ");
                continue;
