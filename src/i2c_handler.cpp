@@ -17,16 +17,10 @@
 #define ERR_INDEX    0x06  // index out of range
 #define ERR_NPARAMS  0x07  // number of params not enough
 
-//#define MAX_PAYLOAD 24
-//#define RX_BUF_SIZE 32
-//#define TX_BUF_SIZE 32
-#define MAX_PAYLOAD 650
-#define RX_BUF_SIZE 1024
-#define TX_BUF_SIZE 1024
 #define MAX_REGISTERS_NUM 255
 
-static uint8_t rxbuf[RX_BUF_SIZE];
-static uint8_t txbuf[TX_BUF_SIZE];
+static uint8_t rxbuf[I2C_RX_BUF_SIZE];
+static uint8_t txbuf[I2C_TX_BUF_SIZE];
 
 static volatile int rx_index = 0;
 static volatile int tx_len = 0;
@@ -64,7 +58,7 @@ uint16_t crc16_ccitt(uint8_t *data, int len) {
 
 //
 
-int handle_command(uint8_t cmd, uint8_t *data, uint8_t len, uint8_t *resp, int *error) {
+int handle_command(uint8_t cmd, uint8_t *data, uint16_t len, uint8_t *resp, int *error) {
 
    uint32_t addr;
 
@@ -170,55 +164,57 @@ void process_frame() {
    
    uint8_t seq = rxbuf[1];
    uint8_t cmd = rxbuf[2];
-   uint8_t len = rxbuf[3];
+   uint16_t len = (rxbuf[3] << 8) | rxbuf[4];
    
-   if(len > MAX_PAYLOAD)
+   if(len > I2C_MAX_PAYLOAD)
       return;
    
-   uint16_t crc_rx = ((uint16_t)rxbuf[4+len] << 8) | rxbuf[5+len];
+   uint16_t crc_rx = ((uint16_t)rxbuf[5+len] << 8) | rxbuf[6+len];
    
-   uint16_t crc = crc16_ccitt(&rxbuf[1],3+len);
+   uint16_t crc = crc16_ccitt(&rxbuf[1],4+len);
    
    if(crc != crc_rx) {
       txbuf[0] = SOF;
       txbuf[1] = seq;
       txbuf[2] = FRAME_ERR;   // error frame
-      txbuf[3] = 1;           // len
-      txbuf[4] = ERR_CRC;     // CRC error
+      txbuf[3] = 0;           // lenh
+      txbuf[4] = 1;           // lenl
+      txbuf[5] = ERR_CRC;     // CRC error
 
-      uint16_t crc_tx = crc16_ccitt(&txbuf[1],4);
+      uint16_t crc_tx = crc16_ccitt(&txbuf[1],5);
 
-      txbuf[5] = crc_tx >> 8;
-      txbuf[6] = crc_tx & 0xFF;
+      txbuf[6] = crc_tx >> 8;
+      txbuf[7] = crc_tx & 0xFF;
 
-      tx_len = 7;
+      tx_len = 8;
       tx_index = 0;
 
       return;
    }
    
    int error = 0;
-   int resp_len = handle_command(cmd, &rxbuf[4], len, &txbuf[4], &error);
+   int resp_len = handle_command(cmd, &rxbuf[5], len, &txbuf[5], &error);
 
    txbuf[0] = SOF;
    txbuf[1] = seq;
    
    if(resp_len < 0) {
       txbuf[2] = FRAME_ERR;   // cmd
-      txbuf[3] = 1;           // len
-      txbuf[4] = ERR_UNK;     // command unknown
+      txbuf[3] = 0;           // lenh
+      txbuf[4] = 1;           // lenl
+      txbuf[5] = ERR_UNK;     // command unknown
       resp_len = 1;
    } else {
       txbuf[2] = (error != 0) ? FRAME_ERR : (cmd | 0x80);
       txbuf[3] = resp_len;
    }
    
-   uint16_t crc_tx = crc16_ccitt(&txbuf[1],3+resp_len);
+   uint16_t crc_tx = crc16_ccitt(&txbuf[1],4+resp_len);
    
-   txbuf[4+resp_len] = crc_tx >> 8;
-   txbuf[5+resp_len] = crc_tx & 0xFF;
+   txbuf[5+resp_len] = crc_tx >> 8;
+   txbuf[6+resp_len] = crc_tx & 0xFF;
    
-   tx_len = 6 + resp_len;
+   tx_len = 7 + resp_len;
    tx_index = 0;
 }
 
@@ -227,11 +223,11 @@ void process_frame() {
 void i2c_debug(void) {
 
    printf("rx_index: %d\n", rx_index);
-   for(int i=0; i<RX_BUF_SIZE; i++)
+   for(int i=0; i<I2C_RX_BUF_SIZE; i++)
       printf("RXBUF[%d]: 0x%X\n", i, rxbuf[i]);
 
    printf("tx_index: %d, tx_len: %d\n", tx_index, tx_len);
-   for(int i=0; i<TX_BUF_SIZE; i++)
+   for(int i=0; i<I2C_TX_BUF_SIZE; i++)
       printf("TXBUF[%d]: 0x%X\n", i, txbuf[i]);
 }
 
@@ -241,7 +237,7 @@ void i2c_slave_handler(i2c_inst_t *i2c, i2c_slave_event_t event) {
 
    switch(event) {
       case I2C_SLAVE_RECEIVE:
-         if(rx_index < RX_BUF_SIZE) {
+         if(rx_index < I2C_RX_BUF_SIZE) {
             rxbuf[rx_index++] = i2c_read_byte_raw(i2c);
          }
          break;

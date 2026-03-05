@@ -72,6 +72,10 @@
 
 #define ROM_SIZE     (384 * 1024)
 
+#define I2C_MAX_PAYLOAD 2100
+#define I2C_RX_BUF_SIZE (I2C_MAX_PAYLOAD * 2)
+#define I2C_TX_BUF_SIZE (I2C_MAX_PAYLOAD * 2)
+
 void board_setup(void);
 
 void set_led_on(void);

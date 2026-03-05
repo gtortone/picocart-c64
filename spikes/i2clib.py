@@ -36,7 +36,8 @@ def build_i2c_frame(seq: int, cmd: int, data=[]) -> bytes:
     frame.append(SOF)
     frame.append(seq & 0xFF)
     frame.append(cmd & 0xFF)
-    frame.append(len(data) & 0xFF)
+    frame.append((len(data) & 0xFF00) >> 8)
+    frame.append((len(data) & 0x00FF))
     frame.extend(data)
     
     crc = crc16_ccitt(frame[1:])
@@ -47,7 +48,7 @@ def build_i2c_frame(seq: int, cmd: int, data=[]) -> bytes:
 
 def validate_i2c_response(frame: bytes, seq = None):
 
-    if len(frame) < 6:
+    if len(frame) < 7:
         return {"valid": False, "error": "frame too short"}
 
     SOF = frame[0]
@@ -61,15 +62,15 @@ def validate_i2c_response(frame: bytes, seq = None):
             return {"valid": False, "error": "invalid sequence"}
 
     cmd = frame[2]
-    length = frame[3]
+    length = (frame[3] << 8) | frame[4]
 
-    if len(frame) != 4 + length + 2:  # SOF+SEQ+CMD+LEN+DATA+CRC16
+    if len(frame) != 5 + length + 2:  # SOF+SEQ+CMD+LEN+DATA+CRC16
         return {"valid": False, "error": "length mismatch"}
 
-    data = frame[4:4+length]
-    crc_rx = (frame[4+length] << 8) | frame[5+length]
+    data = frame[5:5+length]
+    crc_rx = (frame[5+length] << 8) | frame[6+length]
 
-    crc_calc = crc16_ccitt(frame[1:4+length])
+    crc_calc = crc16_ccitt(frame[1:5+length])
 
     if crc_rx != crc_calc:
         return {"valid": False, "error": "CRC mismatch"}
@@ -99,12 +100,12 @@ def send_command(seq, cmd, payload=[], resp_max_len=32):
             # send command
             slave.write(list(frame))
             
-            # read 4 bytes to setup len
-            header = slave.read(4)
-            if len(header) < 4 or header[0] != 0xAA:
+            # read 5 bytes to setup len
+            header = slave.read(5)
+            if len(header) < 5 or header[0] != 0xAA:
                 raise ValueError("header not valid")
 
-            rem_len = int(header[3]) + 2  # SOF+SEQ+CMD+LEN + DATA + CRC
+            rem_len = int( (header[3] << 8) | header[4] ) + 2  # SOF+SEQ+CMD+LEN + DATA + CRC
             if rem_len > resp_max_len:     # FIXME
                 rem_len = resp_max_len
             

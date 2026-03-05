@@ -6,7 +6,7 @@ from pyftdi.i2c import I2cController
 from i2clib import *
 
 addr = 0
-size = 250
+size = 2048
 
 filesize = os.path.getsize(sys.argv[1])
 
