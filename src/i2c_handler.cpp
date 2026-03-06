@@ -1,5 +1,6 @@
 
 #include <stdio.h>      // printf
+#include <cstring>      // memcpy
 #include <cstdint>
 #include "pico/stdlib.h"
 #include "pico/i2c_slave.h"
@@ -29,7 +30,6 @@ static volatile int tx_index = 0;
 
 static uint8_t regs[MAX_REGISTERS_NUM];
 
-//extern uint8_t *hram;
 extern CRTHandler crt;
 
 //
@@ -140,8 +140,8 @@ int handle_command(uint8_t cmd, uint8_t *data, uint16_t len, uint8_t *resp, int 
             *error = 1;
             return 1;
          }
-         for(int i=3; i<len; i++)
-            crt.rawdata[addr+i-3] = data[i];
+         memcpy(crt.rawdata + addr, data+3, len-3);
+
          return 0;
 
       case 0x70: // set led
