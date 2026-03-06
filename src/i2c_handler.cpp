@@ -5,6 +5,7 @@
 #include "pico/i2c_slave.h"
 
 #include "board.h"
+#include "crt.h"
 
 #define SOF          0xAA
 #define FRAME_ERR    0xC0
@@ -28,7 +29,8 @@ static volatile int tx_index = 0;
 
 static uint8_t regs[MAX_REGISTERS_NUM];
 
-extern uint8_t *hram;
+//extern uint8_t *hram;
+extern CRTHandler crt;
 
 //
 
@@ -106,7 +108,7 @@ int handle_command(uint8_t cmd, uint8_t *data, uint16_t len, uint8_t *resp, int 
             *error = 1;
             return 1;
          }
-         resp[0] = hram[addr];
+         resp[0] = crt.rawdata[addr];
          return 1;
 
       case 0x13: // write cartridge location
@@ -122,7 +124,7 @@ int handle_command(uint8_t cmd, uint8_t *data, uint16_t len, uint8_t *resp, int 
             *error = 1;
             return 1;
          }
-         hram[addr] = data[3];
+         crt.rawdata[addr] = data[3];
          return 0;
 
       case 0x23: // write cartridge buffer
@@ -139,7 +141,7 @@ int handle_command(uint8_t cmd, uint8_t *data, uint16_t len, uint8_t *resp, int 
             return 1;
          }
          for(int i=3; i<len; i++)
-            hram[addr+i-3] = data[i];
+            crt.rawdata[addr+i-3] = data[i];
          return 0;
 
       case 0x70: // set led

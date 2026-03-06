@@ -4,6 +4,8 @@
 #include <cstdint>
 #include "ff.h"
 
+#include "board.h"
+
 #define CRT_SIGNATURE      "C64 CARTRIDGE   "
 #define CHIP_SIGNATURE     "CHIP"
 
@@ -41,6 +43,7 @@ typedef struct {
 
    char filename[128];
    FIL fil;
+   uint8_t rawdata[ROM_SIZE];
    uint8_t type;
    bool exrom;
    bool game;
@@ -54,8 +57,10 @@ typedef struct {
 
 CRTFileError crt_file_open(CRTHandler *crt, const char *filename);
 CRTFileError crt_file_close(CRTHandler *crt);
+CRTFileError crt_build_banks(CRTHandler *crt);
 CRTFileError crt_file_parse(CRTHandler *crt);
 CRTFileError crt_buffer_parse(CRTHandler *crt, uint8_t *buffer);
+void crt_clear(CRTHandler *crt);
 void crt_file_to_bin(CRTHandler crt, uint8_t *data);
 void crt_buffer_to_bin(CRTHandler crt, uint8_t *buffer, uint8_t *data);
 

@@ -6,6 +6,7 @@
 #include "pico/stdio_uart.h"
 #include "pico/i2c_slave.h"
 #include "hardware/clocks.h"
+#include "hardware/flash.h"
 #include "hardware/watchdog.h"
 #include "hardware/i2c.h"
 #include "hardware/irq.h"
@@ -34,10 +35,6 @@ void run_cart_super_games(void);
 
 CRTHandler crt;
 
-uint8_t __not_in_flash("cart") cart[ROM_SIZE];
-
-uint8_t *hram;
-
 //
 
 int main(void) {
@@ -51,12 +48,11 @@ int main(void) {
    c64_set_exrom_game(1, 1);         // <no cartridge>
    c64_reset();
 
-   // create PSRAM area
-   hram = (uint8_t *)PSRAM_BASE;
-   
    // mount SD
    FATFS fs;
    FRESULT fr = f_mount(&fs, "", 1);
+
+   sleep_ms(1500);
 
    if(fr != FR_OK)
       printf("E: SD mount failed\n");
@@ -108,9 +104,9 @@ int main(void) {
                // load file
                // parameter: <filename>
                token = strtok(NULL, " ");
+               crt_clear(&crt);
+               // build raw cart
                if((rc = crt_file_open(&crt, token)) == FILE_OK) {
-                  // build raw cart
-                  crt_file_to_bin(crt, cart);
                   // configure C64
                   printf("EXROM: %d, GAME: %d\n", crt.exrom, crt.game);
                   multicore_reset_core1();
@@ -178,15 +174,16 @@ int main(void) {
                   printf("E: ls error %d\n", res);
                }
             } else if (strcmp(token, "test") == 0) {
-               //i2c_debug();
-               for(int i=0; i<16; i++)
-                  printf("cart[%d]: %d (0x%X)\n", i, cart[i], cart[i]);
-               for(int i=0; i<32; i++)
-                  printf("hram[%d]: %d (0x%X)\n", i, hram[i], hram[i]);
+               //
+            } else if (strcmp(token, "info") == 0) {
+               printf("flash size: %ld bytes\n", PICO_FLASH_SIZE_BYTES);
+               printf("flash sector size: %ld bytes\n", FLASH_SECTOR_SIZE);
+               printf("flash page size: %ld bytes\n", FLASH_PAGE_SIZE);
+               printf("flash area address: 0x%X\n", FLASH_AREA_OFFSET);
+               printf("XIP_BASE address: 0x%X\n", XIP_BASE);
             } else if (strcmp(token, "run") == 0) {
-               if((rc = crt_buffer_parse(&crt, hram)) == FILE_OK) {
-                  // build raw cart
-                  crt_buffer_to_bin(crt, hram, cart);
+               // build raw cart
+               if((rc = crt_build_banks(&crt)) == FILE_OK) {
                   // configure C64
                   printf("EXROM: %d, GAME: %d\n", crt.exrom, crt.game);
                   multicore_reset_core1();
@@ -263,7 +260,7 @@ void __time_critical_func(run_cart_8k)(void) {
      
       if( !(control & ROML_MASK) ) {
          if (control & RW_MASK) {
-            DATA_OUT(cart[addr & 0x1FFF]);
+            DATA_OUT(crt.bank[0].data[(addr - 0x8000) & 0x1FFF]);
             SET_DATA_MODE_OUT
             wait_high(ROML);
             SET_DATA_MODE_IN
@@ -291,7 +288,7 @@ void __time_critical_func(run_cart_16k)(void) {
       if( !(control & ROML_MASK) || !(control & ROMH_MASK) ) {
 
          if (control & RW_MASK) {
-            DATA_OUT(cart[addr & 0x3FFF]);
+            DATA_OUT(crt.bank[0].data[(addr - 0x8000) & 0x3FFF]);
             SET_DATA_MODE_OUT
             wait_high(ROML);
             wait_high(ROMH);
@@ -316,6 +313,13 @@ void __time_critical_func(run_cart_ultimax)(void) {
    volatile uint32_t control;
    volatile uint32_t addr;
    int mask = (crt.size - 1);
+   uint8_t bank_low = 0;
+   uint8_t bank_high;
+
+   if(crt.nbanks == 1)
+      bank_high = 0;
+   else 
+      bank_high = 1;
 
    uint32_t irqstatus = save_and_disable_interrupts();
 
@@ -328,14 +332,14 @@ void __time_critical_func(run_cart_ultimax)(void) {
 
       if( !(control & ROML_MASK) ) {
 
-            DATA_OUT(cart[addr & mask]);
+            DATA_OUT(crt.bank[bank_low].data[(addr - 0x8000) & mask]);
             SET_DATA_MODE_OUT
             wait_high(ROML);
             SET_DATA_MODE_IN
 
       } else if( !(control & ROMH_MASK) ) {
 
-            DATA_OUT(cart[addr & mask]);
+            DATA_OUT(crt.bank[bank_high].data[(addr - 0xE000) & mask]);
             SET_DATA_MODE_OUT
             wait_high(ROMH);
             SET_DATA_MODE_IN
@@ -364,9 +368,7 @@ void __time_critical_func(run_cart_magic_desk)(void) {
       if (control & RW_MASK) {
          if( !(control & ROML_MASK) ) {
 
-            addr -= 0x8000;
-            addr += (bank * 0x2000);
-            DATA_OUT(cart[addr]);
+            DATA_OUT(crt.bank[bank].data[(addr - 0x8000)]);
             SET_DATA_MODE_OUT
             wait_high(ROML);
             SET_DATA_MODE_IN
@@ -409,18 +411,14 @@ void __time_critical_func(run_cart_ocean)(void) {
       if (control & RW_MASK) {
          if( !(control & ROML_MASK) ) {
 
-            addr -= 0x8000;
-            addr += (bank * 0x2000);
-            DATA_OUT(cart[addr]);
+            DATA_OUT(crt.bank[bank].data[(addr - 0x8000)]);
             SET_DATA_MODE_OUT
             wait_high(ROML);
             SET_DATA_MODE_IN
 
          } else if( !(control & ROMH_MASK) ) {
 
-            addr -= 0xA000;
-            addr += (bank * 0x2000);
-            DATA_OUT(cart[addr]);
+            DATA_OUT(crt.bank[bank].data[(addr - 0xA000)]);
             SET_DATA_MODE_OUT
             wait_high(ROMH);
             SET_DATA_MODE_IN
@@ -457,9 +455,7 @@ void __time_critical_func(run_cart_fun_play)(void) {
       if (control & RW_MASK) {
          if( !(control & ROML_MASK) ) {
 
-            addr -= 0x8000;
-            addr += (bank * 0x2000);
-            DATA_OUT(cart[addr]);
+            DATA_OUT(crt.bank[bank].data[(addr - 0x8000)]);
             SET_DATA_MODE_OUT
             wait_high(ROML);
             SET_DATA_MODE_IN
@@ -503,9 +499,15 @@ void __time_critical_func(run_cart_super_games)(void) {
       if (control & RW_MASK) {
          if( !(control & ROML_MASK) || !(control & ROMH_MASK) ) {
 
-            addr -= 0x8000;
-            addr += (bank * 0x4000);
-            DATA_OUT(cart[addr]);
+            DATA_OUT(crt.bank[bank].data[(addr - 0x8000)]);
+            SET_DATA_MODE_OUT
+            wait_high(ROML);
+            wait_high(ROMH);
+            SET_DATA_MODE_IN
+
+         } else if( !(control & ROMH_MASK) ) {
+
+            DATA_OUT(crt.bank[bank].data[(addr - 0xA000)]);
             SET_DATA_MODE_OUT
             wait_high(ROML);
             wait_high(ROMH);
