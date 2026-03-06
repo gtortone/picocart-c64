@@ -56,6 +56,7 @@ target_link_libraries(${PROJECT}
    pico_multicore
    pico_i2c_slave
    hardware_i2c
+   hardware_flash
    no-OS-FatFS-SD-SDIO-SPI-RPi-Pico
 )
 
