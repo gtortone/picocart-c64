@@ -171,12 +171,14 @@ CRTFileError crt_build_banks(CRTHandler *crt) {
             crt->bank[bnum].load_addrl = load_addr;
             crt->bank[bnum].datal = bp;
          }
+         crt->bank[bnum].size += size;
       } else {
          crt->bank[bnum].init = true;
          crt->bank[bnum].offset = offset;
          crt->bank[bnum].length = length;
          crt->bank[bnum].type = type;
          crt->bank[bnum].number = bnum;
+         crt->bank[bnum].size = size;
          if(load_addr > 0x8000) {
             crt->bank[bnum].load_addrh = load_addr;
             crt->bank[bnum].datah = bp;
