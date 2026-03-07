@@ -58,7 +58,7 @@ void crt_clear(CRTHandler *crt) {
       crt->bank[i].load_addrl = crt->bank[i].load_addrh = 0;
       crt->bank[i].datal = crt->bank[i].datah = NULL;
    }
-   memset(crt->rawdata, 0, sizeof(crt->rawdata));
+   //memset(crt->rawdata, 0, sizeof(crt->rawdata));
    crt->nbanks = 0;
    crt->size = 0;
 }
