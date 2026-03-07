@@ -191,7 +191,6 @@ int main(void) {
                printf("XIP_BASE address: 0x%X\n", XIP_BASE);
             } else if (strcmp(token, "run") == 0) {
                multicore_reset_core1();
-               crt_clear(&crt);
                // build raw cart
                if((rc = crt_build_banks(&crt)) == FILE_OK) {
                   // debug
