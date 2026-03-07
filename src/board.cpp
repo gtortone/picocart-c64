@@ -12,11 +12,13 @@
 
 void board_setup(void) {
 
-   // overclock
-   set_sys_clock_khz(250000, true);
-   //vreg_set_voltage(VREG_VOLTAGE_1_15);
-   //sleep_ms(300);
-   //set_sys_clock_khz(300000, true);
+   // standard overclock
+   //set_sys_clock_khz(250000, true);
+   //
+   // EasyFlash cartridge overclock
+   vreg_set_voltage(VREG_VOLTAGE_1_20);
+   sleep_ms(300);
+   set_sys_clock_khz(330000, true);
 
    gpio_set_function(UART_TX, UART_FUNCSEL_NUM(UART_ID, UART_TX));
    gpio_set_function(UART_RX, UART_FUNCSEL_NUM(UART_ID, UART_RX));

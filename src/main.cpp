@@ -32,6 +32,7 @@ void run_cart_magic_desk(void);
 void run_cart_ocean(void);
 void run_cart_fun_play(void);
 void run_cart_super_games(void);
+void run_cart_easyflash(void);
 
 CRTHandler crt;
 
@@ -104,12 +105,15 @@ int main(void) {
                // load file
                // parameter: <filename>
                token = strtok(NULL, " ");
+               multicore_reset_core1();
                crt_clear(&crt);
                // build raw cart
                if((rc = crt_file_open(&crt, token)) == FILE_OK) {
+                  crt_file_close(&crt);
+                  // debug
+                  //crt_print(&crt);
                   // configure C64
                   printf("EXROM: %d, GAME: %d\n", crt.exrom, crt.game);
-                  multicore_reset_core1();
                   c64_set_exrom_game(crt.exrom, crt.game);
                   printf("CRT size: %d\n", crt.size);
                   if(crt.type == 0) {
@@ -144,10 +148,13 @@ int main(void) {
                      // Super Games (8)
                      printf("cart: Super Games\n");
                      multicore_launch_core1_with_stack(run_cart_super_games, core1_stack, CORE1_STACK_SIZE);
+                  } else if(crt.type == 32) {
+                     // EasyFlash (32)
+                     printf("cart: EasyFlash\n");
+                     multicore_launch_core1_with_stack(run_cart_easyflash, core1_stack, CORE1_STACK_SIZE);
                   }
                   c64_reset();
                   printf("done\n");
-                  crt_file_close(&crt);
                } else {
                   printf("E: %s\n", CRTFileErrorStrings[rc]);
                }
@@ -176,17 +183,21 @@ int main(void) {
             } else if (strcmp(token, "test") == 0) {
                //
             } else if (strcmp(token, "info") == 0) {
+               printf("CPU frequency: %.0f MHz\n", clock_get_hz(clk_sys) / 1e6);
                printf("flash size: %ld bytes\n", PICO_FLASH_SIZE_BYTES);
                printf("flash sector size: %ld bytes\n", FLASH_SECTOR_SIZE);
                printf("flash page size: %ld bytes\n", FLASH_PAGE_SIZE);
                printf("flash area address: 0x%X\n", FLASH_AREA_OFFSET);
                printf("XIP_BASE address: 0x%X\n", XIP_BASE);
             } else if (strcmp(token, "run") == 0) {
+               multicore_reset_core1();
+               crt_clear(&crt);
                // build raw cart
                if((rc = crt_build_banks(&crt)) == FILE_OK) {
+                  // debug
+                  //crt_print(&crt);
                   // configure C64
                   printf("EXROM: %d, GAME: %d\n", crt.exrom, crt.game);
-                  multicore_reset_core1();
                   c64_set_exrom_game(crt.exrom, crt.game);
                   printf("CRT size: %d\n", crt.size);
                   if(crt.type == 0) {
@@ -221,6 +232,10 @@ int main(void) {
                      // Super Games (8)
                      printf("cart: Super Games\n");
                      multicore_launch_core1_with_stack(run_cart_super_games, core1_stack, CORE1_STACK_SIZE);
+                  } else if(crt.type == 32) {
+                     // EasyFlash (32)
+                     printf("cart: EasyFlash\n");
+                     multicore_launch_core1_with_stack(run_cart_easyflash, core1_stack, CORE1_STACK_SIZE);
                   }
                   c64_reset();
                   printf("done\n");
@@ -259,12 +274,10 @@ void __time_critical_func(run_cart_8k)(void) {
       COMPILER_BARRIER();
      
       if( !(control & ROML_MASK) ) {
-         if (control & RW_MASK) {
-            DATA_OUT(crt.bank[0].data[(addr - 0x8000) & 0x1FFF]);
-            SET_DATA_MODE_OUT
-            wait_high(ROML);
-            SET_DATA_MODE_IN
-         } 
+         DATA_OUT(crt.bank[0].datal[(addr - crt.bank[0].load_addrl) & 0x1FFF]);
+         SET_DATA_MODE_OUT
+         wait_high(ROML);
+         SET_DATA_MODE_IN
       }
    } // end loop
 }
@@ -275,6 +288,19 @@ void __time_critical_func(run_cart_16k)(void) {
 
    volatile uint64_t control;
    volatile uint32_t addr;
+   uint8_t *datal, *datah;
+   uint16_t load_addrl, load_addrh;
+
+   datal = crt.bank[0].datal;
+   load_addrl = crt.bank[0].load_addrl;
+
+   if(crt.bank[0].datah != NULL) {
+      datah = crt.bank[0].datah;
+      load_addrh = crt.bank[0].load_addrh;
+   } else {
+      datah = crt.bank[0].datal;
+      load_addrh = crt.bank[0].load_addrl;
+   }
 
    uint32_t irqstatus = save_and_disable_interrupts();
 
@@ -285,15 +311,19 @@ void __time_critical_func(run_cart_16k)(void) {
       addr = (control & ADDR_GPIO_MASK);
       COMPILER_BARRIER();
 
-      if( !(control & ROML_MASK) || !(control & ROMH_MASK) ) {
+      if( !(control & ROML_MASK) ) {
 
-         if (control & RW_MASK) {
-            DATA_OUT(crt.bank[0].data[(addr - 0x8000) & 0x3FFF]);
-            SET_DATA_MODE_OUT
-            wait_high(ROML);
-            wait_high(ROMH);
-            SET_DATA_MODE_IN
-         } 
+         DATA_OUT(datal[(addr - crt.bank[0].load_addrl) & 0x3FFF]);
+         SET_DATA_MODE_OUT
+         wait_high(ROML);
+         SET_DATA_MODE_IN
+
+      } else if( !(control & ROMH_MASK) ) {
+
+         DATA_OUT(datah[(addr - crt.bank[0].load_addrh) & 0x3FFF]);
+         SET_DATA_MODE_OUT
+         wait_high(ROMH);
+         SET_DATA_MODE_IN
       }
    } // end loop
 }
@@ -312,14 +342,19 @@ void __time_critical_func(run_cart_ultimax)(void) {
 
    volatile uint32_t control;
    volatile uint32_t addr;
-   int mask = (crt.size - 1);
-   uint8_t bank_low = 0;
-   uint8_t bank_high;
+   uint8_t *datal, *datah;
+   uint16_t load_addrl, load_addrh;
 
-   if(crt.nbanks == 1)
-      bank_high = 0;
-   else 
-      bank_high = 1;
+   datal = crt.bank[0].datal;
+   load_addrl = crt.bank[0].load_addrl;
+
+   if(crt.bank[0].datah != NULL) {
+      datah = crt.bank[0].datah;
+      load_addrh = crt.bank[0].load_addrh;
+   } else {
+      datah = crt.bank[0].datal;
+      load_addrh = crt.bank[0].load_addrl;
+   }
 
    uint32_t irqstatus = save_and_disable_interrupts();
 
@@ -332,17 +367,17 @@ void __time_critical_func(run_cart_ultimax)(void) {
 
       if( !(control & ROML_MASK) ) {
 
-            DATA_OUT(crt.bank[bank_low].data[(addr - 0x8000) & mask]);
-            SET_DATA_MODE_OUT
-            wait_high(ROML);
-            SET_DATA_MODE_IN
+         DATA_OUT(datal[(addr - crt.bank[0].load_addrl) & 0x3FFF]);
+         SET_DATA_MODE_OUT
+         wait_high(ROML);
+         SET_DATA_MODE_IN
 
       } else if( !(control & ROMH_MASK) ) {
 
-            DATA_OUT(crt.bank[bank_high].data[(addr - 0xE000) & mask]);
-            SET_DATA_MODE_OUT
-            wait_high(ROMH);
-            SET_DATA_MODE_IN
+         DATA_OUT(datah[(addr - crt.bank[0].load_addrh) & 0x3FFF]);
+         SET_DATA_MODE_OUT
+         wait_high(ROMH);
+         SET_DATA_MODE_IN
       }
    } // end loop
 }
@@ -368,7 +403,7 @@ void __time_critical_func(run_cart_magic_desk)(void) {
       if (control & RW_MASK) {
          if( !(control & ROML_MASK) ) {
 
-            DATA_OUT(crt.bank[bank].data[(addr - 0x8000)]);
+            DATA_OUT(crt.bank[bank].datal[(addr - crt.bank[bank].load_addrl)]);
             SET_DATA_MODE_OUT
             wait_high(ROML);
             SET_DATA_MODE_IN
@@ -411,14 +446,14 @@ void __time_critical_func(run_cart_ocean)(void) {
       if (control & RW_MASK) {
          if( !(control & ROML_MASK) ) {
 
-            DATA_OUT(crt.bank[bank].data[(addr - 0x8000)]);
+            DATA_OUT(crt.bank[bank].datal[(addr - crt.bank[bank].load_addrl) & 0x3FFF]);
             SET_DATA_MODE_OUT
             wait_high(ROML);
             SET_DATA_MODE_IN
 
          } else if( !(control & ROMH_MASK) ) {
 
-            DATA_OUT(crt.bank[bank].data[(addr - 0xA000)]);
+            DATA_OUT(crt.bank[bank].datah[(addr - crt.bank[bank].load_addrh) & 0x3FFF]);
             SET_DATA_MODE_OUT
             wait_high(ROMH);
             SET_DATA_MODE_IN
@@ -455,7 +490,7 @@ void __time_critical_func(run_cart_fun_play)(void) {
       if (control & RW_MASK) {
          if( !(control & ROML_MASK) ) {
 
-            DATA_OUT(crt.bank[bank].data[(addr - 0x8000)]);
+            DATA_OUT(crt.bank[bank].datal[(addr - crt.bank[bank].load_addrl)]);
             SET_DATA_MODE_OUT
             wait_high(ROML);
             SET_DATA_MODE_IN
@@ -468,7 +503,8 @@ void __time_critical_func(run_cart_fun_play)(void) {
          if( !(control & IO1_MASK) && (addr == 0xDE00) ) {
             if ( !(data & 0x80)) {
                c64_set_exrom_game(0, 1);
-               bank = ( (data >> 3) & 0x07 ) | ( (data & 0x01) << 3);
+               //bank = ( (data >> 3) & 0x07 ) | ( (data & 0x01) << 3);
+               bank = data & 0x3F; 
             } else {
                c64_set_exrom_game(1, 1);
             }
@@ -497,33 +533,26 @@ void __time_critical_func(run_cart_super_games)(void) {
       COMPILER_BARRIER();
 
       if (control & RW_MASK) {
+
          if( !(control & ROML_MASK) || !(control & ROMH_MASK) ) {
 
-            DATA_OUT(crt.bank[bank].data[(addr - 0x8000)]);
+            DATA_OUT(crt.bank[bank].datal[(addr - crt.bank[bank].load_addrl)]);
             SET_DATA_MODE_OUT
             wait_high(ROML);
             wait_high(ROMH);
             SET_DATA_MODE_IN
-
-         } else if( !(control & ROMH_MASK) ) {
-
-            DATA_OUT(crt.bank[bank].data[(addr - 0xA000)]);
-            SET_DATA_MODE_OUT
-            wait_high(ROML);
-            wait_high(ROMH);
-            SET_DATA_MODE_IN
-         }
+         } 
 
       } else {
          
          SET_DATA_MODE_IN
          data = DATA_IN;
-         if( !(control & IO2_MASK) && (addr == 0xDF00) && !disable) {
-            if( !(data & 0x04) ) {
-               c64_set_exrom_game(0, 0);
-               bank = data & 0x03;
-            } else {
+         if( !(control & IO2_MASK) && !disable) {
+            bank = data & 0x03;
+            if( (data & 0x04) ) {
                c64_set_exrom_game(1, 1);
+            } else {
+               c64_set_exrom_game(0, 0);
             }
 
             if(data & 0x08)
@@ -535,4 +564,71 @@ void __time_critical_func(run_cart_super_games)(void) {
 
 //
 
+__attribute__((optimize("O3"), hot))
+void __time_critical_func(run_cart_easyflash)(void) {
+   
+   volatile uint64_t control;
+   volatile uint32_t addr;
+   volatile uint8_t data;
+   uint8_t ram_buf[255];
+   uint8_t bank = 0;
+   uint8_t mode = 0;
+   uint8_t ef_control[8][2] = {
+      {1, 0},  // Ultimax
+      {1, 1},  // none
+      {0, 0},  // 16K
+      {0, 1},  // 8K
+      {1, 0},  // Ultimax
+      {1, 1},  // none
+      {0, 0},  // 16K
+      {0, 1}   // 8K
+   };
+
+   uint32_t irqstatus = save_and_disable_interrupts();
+
+   SET_DATA_MODE_IN
+   while(1) {
+
+      control = gpio_get_all64();
+      addr = (control & ADDR_GPIO_MASK);
+      COMPILER_BARRIER();
+
+      SET_DATA_MODE_IN
+      if (control & RW_MASK) {
+
+         if( !(control & ROML_MASK) ) {
+
+            DATA_OUT(crt.bank[bank].datal[(addr - crt.bank[bank].load_addrl) & 0x3FFF]);
+            SET_DATA_MODE_OUT
+            wait_high(ROML);
+
+         } else if( !(control & ROMH_MASK) ) {
+
+            DATA_OUT(crt.bank[bank].datah[(addr - crt.bank[bank].load_addrh) & 0x3FFF]);
+            SET_DATA_MODE_OUT
+            wait_high(ROMH);
+
+         } else if ( !(control & IO2_MASK) ) {
+            
+            DATA_OUT(ram_buf[addr & 0xFF]);
+            SET_DATA_MODE_OUT
+            wait_high(IO2);
+         }
+
+      } else {
+         
+         data = DATA_IN;
+         if( !(control & IO1_MASK) && (addr == 0xDE00) ) {
+            bank = data & 0x3f;
+         } else if( !(control & IO1_MASK) && (addr == 0xDE02) ) {
+            mode = (((data >> 5) & 0x04) | (data & 0x02) | (((data >> 2) & 0x01) & ~data)) & 0x07;
+            c64_set_exrom_game(ef_control[mode][0], ef_control[mode][1]);
+         } else if( !(control & IO2_MASK) ) {
+            ram_buf[addr & 0xFF] = data;
+         }
+      }
+   }  // end loop
+}
+
+//
 

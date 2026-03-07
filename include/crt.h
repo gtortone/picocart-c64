@@ -29,15 +29,23 @@ extern const char* BankTypeStrings[BANK_TYPE_COUNT];
 
 typedef struct {
 
+   bool init = false;
    uint32_t offset;
    uint16_t length;
    BankType type;
    uint8_t number;
-   uint16_t load_addr;
+
+   uint16_t load_addrh;
+   uint16_t load_addrl;
+
+   uint8_t *datah;
+   uint8_t *datal;
+
    uint16_t size;
-   uint8_t *data;
 
 } CRTBank;
+
+#define MAX_BANKS_NUM   128
 
 typedef struct {
 
@@ -49,7 +57,7 @@ typedef struct {
    bool game;
    char name[32];
 
-   CRTBank bank[128];
+   CRTBank bank[MAX_BANKS_NUM];
    uint8_t nbanks;
    uint32_t size;
 
@@ -58,10 +66,7 @@ typedef struct {
 CRTFileError crt_file_open(CRTHandler *crt, const char *filename);
 CRTFileError crt_file_close(CRTHandler *crt);
 CRTFileError crt_build_banks(CRTHandler *crt);
-CRTFileError crt_file_parse(CRTHandler *crt);
-CRTFileError crt_buffer_parse(CRTHandler *crt, uint8_t *buffer);
+void crt_print(CRTHandler *crt);
 void crt_clear(CRTHandler *crt);
-void crt_file_to_bin(CRTHandler crt, uint8_t *data);
-void crt_buffer_to_bin(CRTHandler crt, uint8_t *buffer, uint8_t *data);
 
 #endif

@@ -1,9 +1,9 @@
 
 #include "pico/stdlib.h"
 
-#include "board.h"
+#include "c64_interface.h"
 
-void c64_hold_reset(int ms=250) {
+void c64_hold_reset(int ms) {
    gpio_put(RESET,1);
    sleep_ms(ms);
 }
