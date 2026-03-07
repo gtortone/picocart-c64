@@ -33,6 +33,8 @@ void run_cart_ocean(void);
 void run_cart_fun_play(void);
 void run_cart_super_games(void);
 void run_cart_easyflash(void);
+void run_cart_dinamic(void);
+void run_cart_zaxxon(void);
 
 CRTHandler crt;
 
@@ -52,8 +54,6 @@ int main(void) {
    // mount SD
    FATFS fs;
    FRESULT fr = f_mount(&fs, "", 1);
-
-   sleep_ms(1500);
 
    if(fr != FR_OK)
       printf("E: SD mount failed\n");
@@ -152,6 +152,14 @@ int main(void) {
                      // EasyFlash (32)
                      printf("cart: EasyFlash\n");
                      multicore_launch_core1_with_stack(run_cart_easyflash, core1_stack, CORE1_STACK_SIZE);
+                  } else if(crt.type == 17) {
+                     // Dinamic (17)
+                     printf("cart: Dinamic\n");
+                     multicore_launch_core1_with_stack(run_cart_dinamic, core1_stack, CORE1_STACK_SIZE);
+                  } else if(crt.type == 18) {
+                     // Zaxxon (18)
+                     printf("cart: Zaxxon\n");
+                     multicore_launch_core1_with_stack(run_cart_zaxxon, core1_stack, CORE1_STACK_SIZE);
                   }
                   c64_reset();
                   printf("done\n");
@@ -191,10 +199,11 @@ int main(void) {
                printf("XIP_BASE address: 0x%X\n", XIP_BASE);
             } else if (strcmp(token, "run") == 0) {
                multicore_reset_core1();
+               crt_clear(&crt);
                // build raw cart
                if((rc = crt_build_banks(&crt)) == FILE_OK) {
                   // debug
-                  //crt_print(&crt);
+                  crt_print(&crt);
                   // configure C64
                   printf("EXROM: %d, GAME: %d\n", crt.exrom, crt.game);
                   c64_set_exrom_game(crt.exrom, crt.game);
@@ -235,6 +244,14 @@ int main(void) {
                      // EasyFlash (32)
                      printf("cart: EasyFlash\n");
                      multicore_launch_core1_with_stack(run_cart_easyflash, core1_stack, CORE1_STACK_SIZE);
+                  } else if(crt.type == 17) {
+                     // Dinamic (17)
+                     printf("cart: Dinamic\n");
+                     multicore_launch_core1_with_stack(run_cart_dinamic, core1_stack, CORE1_STACK_SIZE);
+                  } else if(crt.type == 18) {
+                     // Zaxxon (18)
+                     printf("cart: Zaxxon\n");
+                     multicore_launch_core1_with_stack(run_cart_zaxxon, core1_stack, CORE1_STACK_SIZE);
                   }
                   c64_reset();
                   printf("done\n");
@@ -631,3 +648,83 @@ void __time_critical_func(run_cart_easyflash)(void) {
 
 //
 
+void __time_critical_func(run_cart_dinamic)(void) {
+
+   volatile uint64_t control;
+   volatile uint32_t addr;
+   volatile uint8_t data;
+   uint8_t bank = 0;
+
+   uint32_t irqstatus = save_and_disable_interrupts();
+
+   SET_DATA_MODE_IN
+   while(1) {
+
+      control = gpio_get_all64();
+      addr = (control & ADDR_GPIO_MASK);
+      COMPILER_BARRIER();
+
+      if( !(control & ROML_MASK) ) {
+
+         DATA_OUT(crt.bank[bank].datal[(addr - crt.bank[bank].load_addrl) & 0x1FFF]);
+         SET_DATA_MODE_OUT
+         wait_high(ROML);
+         SET_DATA_MODE_IN
+      } 
+
+      if( !(control & IO1_MASK) && (addr & 0xDE00) )
+         bank = addr - 0xDE00;
+
+   }  // end loop
+}
+
+//
+
+void __time_critical_func(run_cart_zaxxon)(void) {
+
+   volatile uint64_t control;
+   volatile uint32_t addr;
+   uint8_t *data;
+   uint16_t load_addr;
+
+   uint32_t irqstatus = save_and_disable_interrupts();
+
+   //data = crt.bank[0].datal;
+   //load_addr = crt.bank[0].load_addrl;
+
+   SET_DATA_MODE_IN
+   while(1) {
+
+      control = gpio_get_all64();
+      addr = (control & ADDR_GPIO_MASK);
+      COMPILER_BARRIER();
+
+      if( !(control & ROML_MASK) ) {
+
+         DATA_OUT(crt.bank[0].datal[(addr - crt.bank[0].load_addrl) & 0x0FFF]);
+         SET_DATA_MODE_OUT
+         wait_high(ROML);
+         SET_DATA_MODE_IN
+
+         if( addr < 0x9000 ) {
+            // 0x8000 - 0x8FFF   bank 0H
+            data = crt.bank[0].datah;
+            load_addr = crt.bank[0].load_addrh;    
+         } else {
+            // 0x9000 - 0x9FFF   bank 1H
+            data = crt.bank[1].datah;
+            load_addr = crt.bank[1].load_addrh;
+         }
+
+      } else if( !(control & ROMH_MASK) ) {
+
+         DATA_OUT(data[(addr - load_addr) & 0x3FFF]);
+         SET_DATA_MODE_OUT
+         wait_high(ROMH);
+         SET_DATA_MODE_IN
+      }
+
+   }  // end loop
+}
+
+//
