@@ -7,6 +7,8 @@
 
 #include "crt.h"
 
+CRTHandler crt;
+
 bool debug = false;
 
 const char* CRTFileErrorStrings[FILE_ERR_COUNT] = {
@@ -48,7 +50,7 @@ CRTFileError crt_file_close(CRTHandler *crt) {
    return FILE_OK;
 }
 
-void crt_clear(CRTHandler *crt) {
+void crt_init(CRTHandler *crt) {
    for(int i=0; i<128; i++) {
       crt->bank[i].init = false;
       crt->bank[i].offset = 0;
@@ -58,9 +60,12 @@ void crt_clear(CRTHandler *crt) {
       crt->bank[i].load_addrl = crt->bank[i].load_addrh = 0;
       crt->bank[i].datal = crt->bank[i].datah = NULL;
    }
-   //memset(crt->rawdata, 0, sizeof(crt->rawdata));
    crt->nbanks = 0;
    crt->size = 0;
+}
+
+void crt_clear_buffer(CRTHandler *crt) {
+   memset(crt->rawdata, 0, sizeof(crt->rawdata));
 }
 
 CRTFileError crt_build_banks(CRTHandler *crt) {

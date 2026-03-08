@@ -44,3 +44,4 @@ build/
 
 lib/*
 spikes/__pycache__
+spikes/*.crt

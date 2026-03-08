@@ -67,6 +67,7 @@ CRTFileError crt_file_open(CRTHandler *crt, const char *filename);
 CRTFileError crt_file_close(CRTHandler *crt);
 CRTFileError crt_build_banks(CRTHandler *crt);
 void crt_print(CRTHandler *crt);
-void crt_clear(CRTHandler *crt);
+void crt_init(CRTHandler *crt);
+void crt_clear_buffer(CRTHandler *crt);
 
 #endif
