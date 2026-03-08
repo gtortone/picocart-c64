@@ -121,6 +121,18 @@ void run_shell(void) {
             } else if (strcmp(token, "test") == 0) {
                //
             } else if (strcmp(token, "info") == 0) {
+               extern char __data_start__;
+               extern char __data_end__;
+               extern char __bss_start__;
+               extern char __bss_end__;
+               extern char __StackLimit;
+               extern char __StackTop;
+               uint32_t data_size = &__data_end__ - &__data_start__;
+               uint32_t bss_size  = &__bss_end__ - &__bss_start__;
+               uint32_t stack_size = &__StackTop - &__StackLimit;
+               printf("DATA:  %u bytes\n", data_size);
+               printf("BSS:   %u bytes\n", bss_size);
+               printf("STACK: %u bytes reserved\n", stack_size);
                printf("CPU frequency: %.0f MHz\n", clock_get_hz(clk_sys) / 1e6);
                printf("flash size: %ld bytes\n", PICO_FLASH_SIZE_BYTES);
                printf("flash sector size: %ld bytes\n", FLASH_SECTOR_SIZE);
