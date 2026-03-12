@@ -21,6 +21,7 @@
 #define CMD_BUFFER_SIZE 64
 
 void run_shell(void);
+void run_read_test(void);
 
 int main(void) {
    
@@ -41,6 +42,7 @@ int main(void) {
    i2c_init_regspace();
 
    run_shell();
+   //run_read_test();
 
    return 0;
 }
@@ -51,6 +53,7 @@ void run_shell(void) {
    char cmd_buffer[cmd_buffer_size];
    uint8_t cmd_index = 0;
    uint8_t rc;
+   extern bool skip;
 
    printf("\n\n-- PicoCart-64 shell --\n\n");
    printf("> ");
@@ -78,7 +81,10 @@ void run_shell(void) {
             
             char *token = strtok(cmd_buffer, " ");
 
-            if (strcmp(token, "reset") == 0) {
+            if (strcmp(token, "skip") == 0) {
+              skip = !skip;
+              printf("skip: %d\n", skip);
+            } else if (strcmp(token, "reset") == 0) {
                // reset command
                // parameter: [cpu], [c64]
                token = strtok(NULL, " ");
@@ -156,3 +162,42 @@ void run_shell(void) {
    }
 }
 
+void run_read_test(void) {
+
+   volatile uint32_t control;
+   volatile uint16_t addr;
+   volatile uint8_t data;
+
+   uint8_t arr[300];
+   int i = 0;
+
+   SET_DATA_MODE_IN
+   while(1) {
+
+      GPIO_GET_LOW_32(control);
+      addr = (control & ADDR_GPIO_MASK);
+      COMPILER_BARRIER();
+
+      if (control & RW_MASK) {
+
+      } else {
+
+         // 0xDF1C  --  POKE 57116,2
+         // 10 FOR X=1 to 255
+         // 20 POKE 57116, X
+         // 30 NEXT X
+         // 40 POKE 57117, 1
+
+         if ( !(control & IO2_MASK) ) {
+            if (addr == 0xDF1C) {
+               arr[i++] = DATA_IN;
+            } else if (addr == 0xDF1D) {
+               for(int b=0; b<i; b++)
+                  printf("%d) %d\n", b, arr[b]);
+               i = 0;
+            }
+            wait_high(IO2);
+         }
+      }
+   } // end loop
+}

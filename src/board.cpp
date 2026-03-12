@@ -10,6 +10,62 @@
 
 #include "board.h"
 
+#define CLOCK_PIN PHI2              // Pin dove arriva il clock esterno
+#define CPU_FREQ_HZ 330000000       // Frequenza CPU RP2350
+#define CLOCK_HZ 1000000            // Frequenza del clock esterno
+#define MARGIN_PERCENT 5            // Margine ±5%
+
+volatile uint32_t valid_clock_count = 0;
+volatile uint32_t last_cycle = 0;
+
+// Calcolo cicli CPU previsti e limiti
+#define EXPECTED_CYCLES (CPU_FREQ_HZ / CLOCK_HZ)
+#define MIN_CYCLES (EXPECTED_CYCLES * (100 - MARGIN_PERCENT) / 100)
+#define MAX_CYCLES (EXPECTED_CYCLES * (100 + MARGIN_PERCENT) / 100)
+
+// Registri Cortex-M33 "bare metal"
+#define DEMCR   (*((volatile uint32_t*)0xE000EDFC))
+#define DWT_CTRL (*((volatile uint32_t*)0xE0001000))
+#define DWT_CYCCNT (*((volatile uint32_t*)0xE0001004))
+
+// Bitmask per abilitare il DWT
+#define DEMCR_TRCENA (1 << 24)
+#define DWT_CYCCNTENA (1 << 0)
+
+// Funzione di inizializzazione DWT->CYCCNT
+void dwt_init(void) {
+    DEMCR |= DEMCR_TRCENA;      // abilita accesso ai registri DWT
+    DWT_CYCCNT = 0;             // reset CYCCNT
+    DWT_CTRL |= DWT_CYCCNTENA;  // abilita contatore cicli
+}
+
+// Callback IRQ GPIO su fronte crescente
+void gpio_callback(uint gpio, uint32_t events) {
+    uint32_t current_cycle = DWT_CYCCNT;
+    uint32_t delta = current_cycle - last_cycle;
+
+    if (delta < MIN_CYCLES || delta > MAX_CYCLES) {
+        valid_clock_count = 0; // periodo non valido
+    } else {
+        valid_clock_count++;   // periodo valido
+    }
+
+    last_cycle = current_cycle;
+}
+
+void wait_valid_clock(void) {
+   while( (valid_clock_count < 4) || (valid_clock_count > 5) )
+      tight_loop_contents();
+}
+
+void sync_with_vic(void) {
+   // wait until the raster beam is in the upper or lower border (if VIC-II is enabled)
+   uint32_t control;
+   do {
+      GPIO_GET_LOW_32(control);
+   } while( !(control & BA_MASK) );
+}
+
 void board_setup(void) {
 
    // standard overclock
@@ -71,9 +127,11 @@ void board_setup(void) {
    gpio_set_dir(LED, GPIO_OUT);
 
    gpio_init(EXROM);
+   gpio_disable_pulls(EXROM);
    gpio_set_dir(EXROM, GPIO_OUT);
 
    gpio_init(GAME);
+   gpio_disable_pulls(GAME);
    gpio_set_dir(GAME, GPIO_OUT);
 
    gpio_init(RESET);
@@ -92,6 +150,15 @@ void board_setup(void) {
 
    // set DATA lines (D0...D7) as input
    SET_DATA_MODE_IN
+
+   dwt_init();
+   last_cycle = DWT_CYCCNT;
+
+   // Configura GPIO come input e interrupt fronte crescente
+   gpio_init(CLOCK_PIN);
+   gpio_set_dir(CLOCK_PIN, GPIO_IN);
+   gpio_pull_down(CLOCK_PIN);
+   gpio_set_irq_enabled_with_callback(CLOCK_PIN, GPIO_IRQ_EDGE_RISE, true, &gpio_callback);
 }
 
 void set_led_on(void) {

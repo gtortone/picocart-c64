@@ -7,6 +7,43 @@
 
 #include "crt.h"
 
+uint8_t crt_buf[460 * 1024];
+
+#define CRT_BANK(bank)          (crt_buf + (uint32_t)(16 * 1024 * bank))
+
+// Fast look-up of 16k ROM bank address   (450 kb)
+uint8_t * const crt_banks[29] = {
+   CRT_BANK(0),
+   CRT_BANK(1),
+   CRT_BANK(2),
+   CRT_BANK(3),
+   CRT_BANK(4),
+   CRT_BANK(5),
+   CRT_BANK(6),
+   CRT_BANK(7),
+   CRT_BANK(8),
+   CRT_BANK(9),
+   CRT_BANK(10),
+   CRT_BANK(11),
+   CRT_BANK(12),
+   CRT_BANK(13),
+   CRT_BANK(14),
+   CRT_BANK(15),
+   CRT_BANK(16),
+   CRT_BANK(17),
+   CRT_BANK(18),
+   CRT_BANK(19),
+   CRT_BANK(20),
+   CRT_BANK(21),
+   CRT_BANK(22),
+   CRT_BANK(23),
+   CRT_BANK(24),
+   CRT_BANK(25),
+   CRT_BANK(26),
+   CRT_BANK(27),
+   CRT_BANK(28)
+};
+
 CRTHandler crt;
 
 bool debug = false;
@@ -32,8 +69,6 @@ CRTFileError crt_file_open(CRTHandler *crt, const char *filename) {
 
    UINT br;
    DWORD file_size = f_size(&crt->fil);
-
-   fr = f_read(&crt->fil, crt->rawdata, file_size, &br);
 
    if(fr != FR_OK)
       return FILE_ERR_NOT_VALID;      
@@ -65,15 +100,12 @@ void crt_init(CRTHandler *crt) {
 }
 
 void crt_clear_buffer(CRTHandler *crt) {
-   memset(crt->rawdata, 0, sizeof(crt->rawdata));
 }
 
 CRTFileError crt_build_banks(CRTHandler *crt) {
 
    uint8_t buf[64];
    UINT br;
-   uint8_t *bp = crt->rawdata;
-   int pos = 0;
 
    // clear
    crt->nbanks = 0;
@@ -81,48 +113,38 @@ CRTFileError crt_build_banks(CRTHandler *crt) {
 
    // header
 
-   if(strncmp((char *)bp, CRT_SIGNATURE, strlen(CRT_SIGNATURE)))
+   f_read(&crt->fil, buf, strlen(CRT_SIGNATURE), &br);
+   buf[strlen(CRT_SIGNATURE)] = '\0';
+
+   if(strncmp((char *)buf, CRT_SIGNATURE, strlen(CRT_SIGNATURE)))
       return FILE_ERR_FORMAT;
 
-   pos += strlen(CRT_SIGNATURE);
-   bp += strlen(CRT_SIGNATURE);
+   f_read(&crt->fil, buf, 4, &br);
+   uint32_t header_length = ((uint32_t)buf[0] << 24) |
+    ((uint32_t)buf[1] << 16) |
+    ((uint32_t)buf[2] << 8)  |
+    ((uint32_t)buf[3]);
 
-   uint32_t header_length = ((uint32_t)bp[0] << 24) |
-    ((uint32_t)bp[1] << 16) |
-    ((uint32_t)bp[2] << 8)  |
-    ((uint32_t)bp[3]);
+   // cartridge version
+   f_read(&crt->fil, buf, 2, &br);
 
-   pos += 4;
-   bp += 4;
+   f_read(&crt->fil, buf, 2, &br);
+   crt->type = (buf[0] << 8) | (buf[1]);
 
-   pos += 2;
-   bp += 2;
-
-   crt->type = (bp[0] << 8) | (bp[1]);
-
-   pos += 2;
-   bp += 2;
-
-   crt->exrom = bool(bp[0]);
-   pos++;
-   bp++;
-
-   crt->game = bool(bp[0]);
-   pos++;
-   bp++;
+   f_read(&crt->fil, buf, 1, &br);
+   crt->exrom = bool(buf[0]);
+   f_read(&crt->fil, buf, 1, &br);
+   crt->game = bool(buf[0]);
 
    // fix Ocean bad EXROM/GAME
    if(crt->type == 5)
       crt->exrom = crt->game = 0;
 
-   pos += 6;
-   bp += 6;
+   f_read(&crt->fil, buf, 6, &br);
 
-   strncpy(crt->name, (char *)bp, 32);
+   f_read(&crt->fil, buf, 32, &br);
+   strncpy(crt->name, (char *)buf, 32);
 
-   pos += 32;
-   bp += 32;
-   
    // chip packets
 
    uint8_t i = 0;
@@ -133,71 +155,73 @@ CRTFileError crt_build_banks(CRTHandler *crt) {
    uint16_t load_addr;
    uint16_t size;
 
-   while(true) {
+   uint32_t total_size;
 
-      offset = pos;
+   while(!f_eof(&crt->fil)) {
 
-      if(strncmp((char *)bp, CHIP_SIGNATURE, strlen(CHIP_SIGNATURE)))
-         break;
+      uint32_t offset = f_tell(&crt->fil);
 
-      pos += strlen(CHIP_SIGNATURE);
-      bp += strlen(CHIP_SIGNATURE);
+      f_read(&crt->fil, buf, strlen(CHIP_SIGNATURE), &br);
+      buf[strlen(CHIP_SIGNATURE)] = '\0';
 
-      length = (bp[0] << 24) | (bp[1] << 16) | (bp[2] << 8) | (bp[3]);
+      if(strcmp((char *)buf, CHIP_SIGNATURE))
+         return FILE_ERR_FORMAT;
 
-      pos += 4;
-      bp += 4;
+      uint32_t file_offset = offset;
 
-      type = (BankType) ((bp[0] << 8) | bp[1]);
+      f_read(&crt->fil, buf, 4, &br);
 
-      pos += 2;
-      bp += 2;
+      uint16_t length = (buf[0] << 24) | (buf[1] << 16) | (buf[2] << 8) | (buf[3]);
 
-      uint8_t bnum = ((bp[0] << 8) | bp[1]);
+      f_read(&crt->fil, buf, 2, &br);
+      BankType type = (BankType) ((buf[0] << 8) | buf[1]);
 
-      pos += 2;
-      bp += 2;
+      f_read(&crt->fil, buf, 2, &br);
+      uint8_t number = ((buf[0] << 8) | buf[1]); 
 
-      load_addr = ((bp[0] << 8) | bp[1]);
+      f_read(&crt->fil, buf, 2, &br);
+      uint16_t load_addr = ((buf[0] << 8) | buf[1]);
 
-      pos += 2;
-      bp += 2;
+      f_read(&crt->fil, buf, 2, &br);
+      uint16_t size = ((buf[0] << 8) | buf[1]);
 
-      size = ((bp[0] << 8) | bp[1]);
-
-      pos += 2;
-      bp += 2;
-
-      if(crt->bank[bnum].init == true) {
-         if(load_addr > 0x8000) {
-            crt->bank[bnum].load_addrh = load_addr;
-            crt->bank[bnum].datah = bp;
-         } else {
-            crt->bank[bnum].load_addrl = load_addr;
-            crt->bank[bnum].datal = bp;
-         }
-         crt->bank[bnum].size += size;
-      } else {
-         crt->bank[bnum].init = true;
-         crt->bank[bnum].offset = offset;
-         crt->bank[bnum].length = length;
-         crt->bank[bnum].type = type;
-         crt->bank[bnum].number = bnum;
-         crt->bank[bnum].size = size;
-         if(load_addr > 0x8000) {
-            crt->bank[bnum].load_addrh = load_addr;
-            crt->bank[bnum].datah = bp;
-         } else {
-            crt->bank[bnum].load_addrl = load_addr;
-            crt->bank[bnum].datal = bp;
-         }
-         crt->nbanks++;
-      }
-
-      pos += size;
-      bp += size;
+      uint32_t ofs = 0;
       
-      crt->size += size;
+      // ROML bank (and ROMH for >8k images)
+      if(load_addr == 0x8000 && size <= 16*1024) {
+         // Support ROML only cartridges with more than 64 banks
+         // 7: Fun Play, 19: Magic desk
+         if(size <= 8*1024 && (crt->type == 7 || crt->type == 19) ) {
+            bool odd_bank = number & 1;
+            number >>= 1;
+            ofs = number * 16*1024;
+
+            // Use ROMH bank location for odd banks
+            if (odd_bank)
+               ofs += 8*1024;
+
+         } else {
+
+            ofs = number * 16*1024;
+         }
+
+      // ROMH bank
+      } else if ( (load_addr == 0xa000 || load_addr == 0xe000) && size <= 8*1024 ) {
+         ofs = number * 16*1024 + 8*1024;
+      } else if ( load_addr == 0xf000 && size <= 4*1024 ) {
+         ofs = number * 16*1024 + 8*1024;
+      }
+      
+      printf("bank %d, load_addr: 0x%X, ofs: %u\n", number, load_addr, ofs);
+
+      uint8_t *read_buf = crt_buf + ofs;
+      f_read(&crt->fil, read_buf, size, &br);
+
+      // Mirror 4k image
+      if(size <= 4*1024)
+         memcpy(&read_buf[4*1024], read_buf, 4*1024);
+
+      total_size += size;
    }
 
    return FILE_OK;

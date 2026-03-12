@@ -13,12 +13,12 @@ inline void c64_set_exrom_game(bool exrom, bool game) {
 }
 
 inline void wait_low(int line) {
-   while (gpio_get(line))
+   while(sio_hw->gpio_in & (1u << line))
       tight_loop_contents();
 }
 
 inline void wait_high(int line) {
-   while (!(gpio_get(line)))
+   while(!(sio_hw->gpio_in & (1u << line)))
       tight_loop_contents();
 }
 
