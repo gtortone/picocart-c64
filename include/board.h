@@ -76,8 +76,7 @@
 #define FLASH_AREA_SIZE    1024 * 1024     // 1 MB
 #define FLASH_AREA_OFFSET  PICO_FLASH_SIZE_BYTES - FLASH_AREA_SIZE
 
-//#define ROM_SIZE     (450 * 1024)
-#define ROM_SIZE     (128)    // disabled
+#define CRT_BUFFER_SIZE    (450 * 1024)
 
 #define I2C_MAX_PAYLOAD 2100
 #define I2C_RX_BUF_SIZE (I2C_MAX_PAYLOAD * 2)

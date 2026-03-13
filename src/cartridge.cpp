@@ -10,8 +10,7 @@
 #include "crt.h"
 
 extern CRTHandler crt;
-extern uint8_t crt_buf[320 * 1024];
-volatile bool skip = false;
+extern uint8_t crt_buf[CRT_BUFFER_SIZE];
 
 #define wait_until(t) { for(int i=0; i<t; i++) asm volatile("nop\n"); } // 4ns
 
@@ -181,8 +180,9 @@ void __time_critical_func(run_cart_magic_desk)(void) {
                c64_set_exrom_game(1, 1);
             }
          }
-         if( !(control & IO2_MASK) && (addr == 0xDF1C) )
-            printf("D: %d\n", data);
+         // test PRG
+         //if( !(control & IO2_MASK) && (addr == 0xDF1C) )
+         //   printf("D: %d\n", data);
       }
    }  // end loop
 }
@@ -367,7 +367,6 @@ void __time_critical_func(run_cart_easyflash)(void) {
 
       } else {
          
-         SET_DATA_MODE_IN
          data = DATA_IN;
          if( !(control & IO1_MASK) ) {
 

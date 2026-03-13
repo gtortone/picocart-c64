@@ -7,7 +7,7 @@
 
 #include "crt.h"
 
-uint8_t crt_buf[460 * 1024];
+uint8_t __not_in_flash() crt_buf[CRT_BUFFER_SIZE];
 
 #define CRT_BANK(bank)          (crt_buf + (uint32_t)(16 * 1024 * bank))
 
@@ -59,6 +59,10 @@ const char* BankTypeStrings[BANK_TYPE_COUNT] = {
    "ROM",
    "FLASH"
 };
+
+void crt_set_buffer(CRTHandler *crt, uint8_t *buffer) {
+   crt->rawdata = buffer;
+}
 
 CRTFileError crt_file_open(CRTHandler *crt, const char *filename) {
 
@@ -137,8 +141,13 @@ CRTFileError crt_build_banks(CRTHandler *crt) {
    crt->game = bool(buf[0]);
 
    // fix Ocean bad EXROM/GAME
-   if(crt->type == 5)
+   if(crt->type == 5) {
       crt->exrom = crt->game = 0;
+   }
+   else if(crt->type == 32) {    // fix EasyFlash bad EXROM/GAME
+      crt->exrom = 1; 
+      crt->game = 0;
+   }
 
    f_read(&crt->fil, buf, 6, &br);
 
@@ -155,7 +164,7 @@ CRTFileError crt_build_banks(CRTHandler *crt) {
    uint16_t load_addr;
    uint16_t size;
 
-   uint32_t total_size;
+   uint32_t total_size = 0;
 
    while(!f_eof(&crt->fil)) {
 
@@ -223,6 +232,8 @@ CRTFileError crt_build_banks(CRTHandler *crt) {
 
       total_size += size;
    }
+
+   crt->size = total_size;
 
    return FILE_OK;
 }
