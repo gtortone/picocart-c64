@@ -45,8 +45,6 @@
 #define UART_TX      46
 #define UART_BAUDRATE 115200
 
-#define PSRAM_CS     47
-
 #define IO1_MASK     ((uint64_t)1 << IO1)
 #define IO2_MASK     ((uint64_t)1 << IO2)
 #define PHI2_MASK    ((uint64_t)1 << PHI2)
@@ -69,9 +67,6 @@
 #define DATA_OUT(v) sio_hw->gpio_out = (sio_hw->gpio_out & ~(0xFF << PINROMDATA)) | ((v)<<PINROMDATA);
 #define DATA_IN ((sio_hw->gpio_in & DATA_GPIO_MASK) >> PINROMDATA)
 #define DATA_IN_BYTE DATA_IN
-
-#define PSRAM_BASE   0x11000000
-#define PSRAM_SIZE   (2048 * 1024)  // 2 MB
 
 #define FLASH_AREA_SIZE    1024 * 1024     // 1 MB
 #define FLASH_AREA_OFFSET  PICO_FLASH_SIZE_BYTES - FLASH_AREA_SIZE
