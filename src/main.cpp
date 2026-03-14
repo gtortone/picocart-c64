@@ -17,10 +17,12 @@
 #include "utils.h"
 #include "ff.h"
 #include "cartridge.h"
+#include "crt.h"
 
 #define CMD_BUFFER_SIZE 64
 
 void run_shell(void);
+void run_read_test(void);
 
 int main(void) {
    
@@ -28,6 +30,11 @@ int main(void) {
 
    c64_set_exrom_game(1, 1);         // <no cartridge>
    c64_reset();
+
+   // set buffer for ROM
+   extern uint8_t crt_buf[CRT_BUFFER_SIZE];
+   extern CRTHandler crt;
+   crt_set_buffer(&crt, crt_buf);
 
    // mount SD
    FATFS fs;
@@ -41,6 +48,7 @@ int main(void) {
    i2c_init_regspace();
 
    run_shell();
+   //run_read_test();
 
    return 0;
 }
@@ -51,9 +59,14 @@ void run_shell(void) {
    char cmd_buffer[cmd_buffer_size];
    uint8_t cmd_index = 0;
    uint8_t rc;
+   char path[32] = "/";
+   char prev_path[64];
+   FRESULT res;
+   DIR dir;
+   FILINFO fno;
 
-   printf("\n\n-- PicoCart-64 shell --\n\n");
-   printf("> ");
+   printf("\n\n-- GOCart.64 shell --\n\n");
+   printf("%s:> ", path);
    while(1) {
       while (uart_is_readable(UART_ID)) {
          char c = uart_getc(UART_ID);
@@ -95,13 +108,16 @@ void run_shell(void) {
                // load file
                // parameter: <filename>
                token = strtok(NULL, " ");
-               run_cart(token);
+               if(strlen(path) == 1)
+                  sprintf(prev_path, "%s%s", path, token);
+               else
+                  sprintf(prev_path, "%s/%s", path, token);
+               if (run_cart(prev_path) != FILE_OK) {
+                  printf("E: file not found (%s)\n", prev_path);
+               }
             } else if (strcmp(token, "ls") == 0) {
                // list files/directories
-               FRESULT res;
-               DIR dir;
-               FILINFO fno;
-               res = f_opendir(&dir, "/");
+               res = f_opendir(&dir, path);
                if (res == FR_OK) {
                   while (1) {
                      if ( (f_readdir(&dir, &fno) != FR_OK) || (fno.fname[0] == 0) )
@@ -118,8 +134,33 @@ void run_shell(void) {
                } else {
                   printf("E: ls error %d\n", res);
                }
-            } else if (strcmp(token, "test") == 0) {
-               //
+            } else if (strcmp(token, "cd") == 0) {
+               token = strtok(NULL, " ");
+               strcpy(prev_path, path);
+               if(token[0] == '/') {    // absolute path
+                  sprintf(path, "%s", token);
+               } else {
+                  if (strcmp(token, ".") == 0) {
+                     ;  // do nothing
+                  } else if (strcmp(token, "..") == 0) {
+                     char *last_slash = strrchr(path, '/');
+                     if (last_slash != NULL) {
+                        *(last_slash) = '\0';
+                        if(strlen(path) == 0)
+                           strcpy(path, "/");
+                     }
+                  } else {
+                     if(strlen(path) == 1)
+                        sprintf(path, "%s%s", prev_path, token); // relative path  (first level)
+                     else
+                        sprintf(path, "%s/%s", prev_path, token); // relative path
+                  }
+               }
+               res = f_opendir(&dir, path);
+               if (res != FR_OK) {
+                  printf("E: directory %s not found\n", token);
+                  strcpy(path, prev_path);
+               } else f_closedir(&dir);
             } else if (strcmp(token, "info") == 0) {
                extern char __data_start__;
                extern char __data_end__;
@@ -142,13 +183,13 @@ void run_shell(void) {
             } else if (strcmp(token, "run") == 0) {
                run_cart(NULL, false);
             } else if (strlen(cmd_buffer) == 0) {
-               printf("> ");
+               printf("%s:> ", path);
                continue;
             } else {
                printf("%s: unknown command\n", cmd_buffer);
             }
             cmd_index = 0;
-            printf("> ");
+            printf("%s:> ", path);
          } else if (cmd_index < cmd_buffer_size - 1) {
             cmd_buffer[cmd_index++] = c;
          }
@@ -156,3 +197,42 @@ void run_shell(void) {
    }
 }
 
+void run_read_test(void) {
+
+   volatile uint32_t control;
+   volatile uint16_t addr;
+   volatile uint8_t data;
+
+   uint8_t arr[300];
+   int i = 0;
+
+   SET_DATA_MODE_IN
+   while(1) {
+
+      GPIO_GET_LOW_32(control);
+      addr = (control & ADDR_GPIO_MASK);
+      COMPILER_BARRIER();
+
+      if (control & RW_MASK) {
+
+      } else {
+
+         // 0xDF1C  --  POKE 57116,2
+         // 10 FOR X=1 to 255
+         // 20 POKE 57116, X
+         // 30 NEXT X
+         // 40 POKE 57117, 1
+
+         if ( !(control & IO2_MASK) ) {
+            if (addr == 0xDF1C) {
+               arr[i++] = DATA_IN;
+            } else if (addr == 0xDF1D) {
+               for(int b=0; b<i; b++)
+                  printf("%d) %d\n", b, arr[b]);
+               i = 0;
+            }
+            wait_high(IO2);
+         }
+      }
+   } // end loop
+}

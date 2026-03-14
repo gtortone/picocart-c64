@@ -5,9 +5,7 @@
 
 uint8_t run_cart(char *filename=NULL, bool clear_buffer=true);
 
-void run_cart_8k(void);
-void run_cart_16k(void);
-void run_cart_ultimax(void);
+void run_cart_normal(void);
 void run_cart_magic_desk(void);
 void run_cart_ocean(void);
 void run_cart_fun_play(void);

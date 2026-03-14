@@ -98,7 +98,7 @@ int handle_command(uint8_t cmd, uint8_t *data, uint16_t len, uint8_t *resp, int 
       case 0x12: // read cartridge location
          if(len >= 3) {
             addr = (data[0] << 16) | (data[1] << 8) | data[2];
-            if(addr > ROM_SIZE) {
+            if(addr > CRT_BUFFER_SIZE) {
                resp[0] = ERR_INDEX;
                *error = 1;
                return 1;
@@ -114,7 +114,7 @@ int handle_command(uint8_t cmd, uint8_t *data, uint16_t len, uint8_t *resp, int 
       case 0x13: // write cartridge location
          if(len >= 4) {
             addr = (data[0] << 16) | (data[1] << 8) | data[2];
-            if(addr > ROM_SIZE) {
+            if(addr > CRT_BUFFER_SIZE) {
                resp[0] = ERR_INDEX;
                *error = 1;
                return 1;
@@ -130,7 +130,7 @@ int handle_command(uint8_t cmd, uint8_t *data, uint16_t len, uint8_t *resp, int 
       case 0x23: // write cartridge buffer
          if(len >= 4) {
             addr = (data[0] << 16) | (data[1] << 8) | data[2];
-            if(addr > ROM_SIZE) {
+            if(addr > CRT_BUFFER_SIZE) {
                resp[0] = ERR_INDEX;
                *error = 1;
                return 1;

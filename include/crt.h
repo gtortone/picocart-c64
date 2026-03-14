@@ -51,7 +51,7 @@ typedef struct {
 
    char filename[128];
    FIL fil;
-   uint8_t rawdata[ROM_SIZE];
+   uint8_t *rawdata;
    uint8_t type;
    bool exrom;
    bool game;
@@ -63,6 +63,7 @@ typedef struct {
 
 } CRTHandler;
 
+void crt_set_buffer(CRTHandler *crt, uint8_t *buffer);
 CRTFileError crt_file_open(CRTHandler *crt, const char *filename);
 CRTFileError crt_file_close(CRTHandler *crt);
 CRTFileError crt_build_banks(CRTHandler *crt);

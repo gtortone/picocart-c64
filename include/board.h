@@ -19,9 +19,9 @@
 #define ROML         27
 #define ROMH         28
 #define BA           29
-#define EXROM        30    // inverted logic
+#define RW           30
 #define GAME         31    // inverted logic
-#define RW           32
+#define EXROM        32    // inverted logic
 #define RESET        33    // inverted logic
 
 // SD pins
@@ -59,11 +59,14 @@
 #define ADDR_GPIO_MASK     (0xFFFF << PINROMADDR)
 #define DATA_GPIO_MASK     (0xFF << PINROMDATA)
 
-#define SET_DATA_MODE_OUT   gpio_set_dir_out_masked(DATA_GPIO_MASK);
-#define SET_DATA_MODE_IN    gpio_set_dir_in_masked(DATA_GPIO_MASK);
+#define SET_DATA_MODE_OUT     sio_hw->gpio_oe_set = DATA_GPIO_MASK;
+#define SET_DATA_MODE_IN      sio_hw->gpio_oe_clr = DATA_GPIO_MASK;
+
+#define GPIO_GET_LOW_32(v)    pico_default_asm_volatile ("mrc p0, #0, %0, c0, c8" : "=r" (v));
+#define GPIO_GET_HIGH_32(v)   pico_default_asm_volatile ("mrc p0, #0, %0, c0, c9" : "=r" (v));
 
 #define ADDR_IN (sio_hw->gpio_in & ADDR_GPIO_MASK) >> PINROMADDR
-#define DATA_OUT(v) sio_hw->gpio_togl = (sio_hw->gpio_out ^ (v << PINROMDATA)) & DATA_GPIO_MASK
+#define DATA_OUT(v) sio_hw->gpio_out = (sio_hw->gpio_out & ~(0xFF << PINROMDATA)) | ((v)<<PINROMDATA);
 #define DATA_IN ((sio_hw->gpio_in & DATA_GPIO_MASK) >> PINROMDATA)
 #define DATA_IN_BYTE DATA_IN
 
@@ -73,13 +76,19 @@
 #define FLASH_AREA_SIZE    1024 * 1024     // 1 MB
 #define FLASH_AREA_OFFSET  PICO_FLASH_SIZE_BYTES - FLASH_AREA_SIZE
 
-#define ROM_SIZE     (450 * 1024)
+#define CRT_BUFFER_SIZE    (450 * 1024)
 
 #define I2C_MAX_PAYLOAD 2100
 #define I2C_RX_BUF_SIZE (I2C_MAX_PAYLOAD * 2)
 #define I2C_TX_BUF_SIZE (I2C_MAX_PAYLOAD * 2)
 
+#define SYST_CSR (*(volatile uint32_t*)0xE000E010)
+#define SYST_RVR (*(volatile uint32_t*)0xE000E014)
+#define SYST_CVR (*(volatile uint32_t*)0xE000E018)
+
 void board_setup(void);
+void wait_valid_clock(void);
+void sync_with_vic(void);
 
 void set_led_on(void);
 void set_led_off(void);

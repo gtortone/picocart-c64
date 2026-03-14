@@ -10,6 +10,14 @@
 
 #include "board.h"
 
+void sync_with_vic(void) {
+   // wait until the raster beam is in the upper or lower border (if VIC-II is enabled)
+   uint32_t control;
+   do {
+      GPIO_GET_LOW_32(control);
+   } while( !(control & BA_MASK) );
+}
+
 void board_setup(void) {
 
    // standard overclock
@@ -71,9 +79,11 @@ void board_setup(void) {
    gpio_set_dir(LED, GPIO_OUT);
 
    gpio_init(EXROM);
+   gpio_disable_pulls(EXROM);
    gpio_set_dir(EXROM, GPIO_OUT);
 
    gpio_init(GAME);
+   gpio_disable_pulls(GAME);
    gpio_set_dir(GAME, GPIO_OUT);
 
    gpio_init(RESET);
