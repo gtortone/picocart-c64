@@ -1,7 +1,11 @@
 cmake_minimum_required(VERSION 3.12)
 
-set(PICO_PLATFORM rp2350)
 set(PROJECT GOCart.64)
+
+set(PICO_PLATFORM rp2350)
+
+# set boards directory
+set(PICO_BOARD_HEADER_DIRS ${CMAKE_CURRENT_LIST_DIR}/boards)
 
 include(/usr/share/pico-sdk/pico_sdk_init.cmake)
 
