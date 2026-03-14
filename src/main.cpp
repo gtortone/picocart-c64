@@ -65,7 +65,7 @@ void run_shell(void) {
    DIR dir;
    FILINFO fno;
 
-   printf("\n\n-- PicoCart-64 shell --\n\n");
+   printf("\n\n-- GOCart.64 shell --\n\n");
    printf("%s:> ", path);
    while(1) {
       while (uart_is_readable(UART_ID)) {

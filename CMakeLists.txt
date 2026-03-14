@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.12)
 
 set(PICO_PLATFORM rp2350)
-set(PROJECT picocart-c64)
+set(PROJECT GOCart.64)
 
 include(/usr/share/pico-sdk/pico_sdk_init.cmake)
 
